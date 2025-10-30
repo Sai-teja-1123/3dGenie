@@ -143,3 +143,13 @@ node_modules/
 /build/
 .env
 .env.*
+
+# Vite cache
+.vite/
+
+# Large downloaded/demo asset dumps (exclude scraped site bundle)
+src/gallery 3d models/twenty-trinket-treasures -_files/
+src/gallery 3d models/twenty-trinket-treasures -.html
+
+# Local sample conversion outputs (huge .obj/.mtl/.jpg set)
+anime+character+3d+model/
