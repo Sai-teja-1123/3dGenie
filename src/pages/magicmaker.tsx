@@ -160,10 +160,10 @@ const MagicMaker = () => {
                     "/src/gallery 3d models/character-superhero.png",
                     "/src/gallery 3d models/character-fairy.png",
                     "/src/gallery 3d models/character-astronaut.png",
-                    "/src/gallery 3d models/one_piece_blue.jpeg",
-                    "/src/gallery 3d models/bossbaby-blue.jpeg",
-                    "/src/gallery 3d models/moana_blue.jpeg",
-                    "/src/gallery 3d models/snowwhite_blue.jpeg",
+                    "/src/gallery 3d models/opb.jpeg",
+                    "/src/gallery 3d models/boss_blbg.jpeg",
+                    "/src/gallery 3d models/moanabg.jpg",
+                    "/src/gallery 3d models/elsabg.jpeg",
                   ].map((src) => (
                     <button
                       key={src}
