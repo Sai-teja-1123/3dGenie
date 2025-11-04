@@ -1,0 +1,69 @@
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Check } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface PricingCardProps {
+  title: string;
+  price: number;
+  period: string;
+  features: string[];
+  isPopular?: boolean;
+  isSelected: boolean;
+  onSelect: () => void;
+}
+
+export const PricingCard = ({
+  title,
+  price,
+  period,
+  features,
+  isPopular = false,
+  isSelected,
+  onSelect,
+}: PricingCardProps) => {
+  return (
+    <Card
+      className={cn(
+        "p-6 relative transition-all duration-300 hover:scale-105 cursor-pointer bg-gradient-card border-2",
+        isSelected 
+          ? "border-primary shadow-glow" 
+          : "border-border hover:border-primary/50",
+        isPopular && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+      )}
+      onClick={onSelect}
+    >
+      {isPopular && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+          <span className="bg-gradient-primary px-4 py-1 rounded-full text-xs font-semibold text-primary-foreground">
+            POPULAR
+          </span>
+        </div>
+      )}
+      <div className="text-center mb-6">
+        <h3 className="text-xl font-bold text-foreground mb-2">{title}</h3>
+        <div className="flex items-baseline justify-center gap-1">
+          <span className="text-4xl font-bold text-primary">₹{price}</span>
+          <span className="text-muted-foreground">/{period}</span>
+        </div>
+      </div>
+      <ul className="space-y-3 mb-6">
+        {features.map((feature, index) => (
+          <li key={index} className="flex items-start gap-2">
+            <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+            <span className="text-sm text-muted-foreground">{feature}</span>
+          </li>
+        ))}
+      </ul>
+      <Button
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect();
+        }}
+        className="w-full bg-gradient-primary hover:opacity-90 text-primary-foreground font-semibold transition-all"
+      >
+        Select Plan
+      </Button>
+    </Card>
+  );
+};
