@@ -1,4 +1,5 @@
 import ModelViewer3D from "@/components/ModelViewer3D";
+<<<<<<< HEAD
 import { Upload, ArrowLeft, Twitter, Instagram, Facebook, ShoppingBag, Trash, Sparkles, Palette } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -42,10 +43,16 @@ const accessoryOptions: AccessoryOption[] = [
 ];
 
 const colorPartsOrder: ColorPart[] = ["hair", "outfit", "skin", "shoes"];
+=======
+import { Upload, LogIn, Twitter, Instagram, Facebook, ShoppingBag, Trash } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
 
 const MagicMaker = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+<<<<<<< HEAD
   const cropCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const cropImgRef = useRef<HTMLImageElement | null>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -78,10 +85,16 @@ const MagicMaker = () => {
   const [progress, setProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState<"idle" | "running" | "done">("idle");
   const [generationMessage, setGenerationMessage] = useState("");
+=======
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [modelUrl, setModelUrl] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
   const user = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("auth_user") || "null"); } catch { return null; }
   }, []);
 
+<<<<<<< HEAD
   const readyForCustomization = Boolean(previewUrl && model);
   const estimatedSecondsLeft = generating ? Math.max(0, Math.ceil((100 - progress) * 0.35)) : 0;
   const selectedAccessoryLabel = selectedAccessory ? accessoryOptions.find((opt) => opt.id === selectedAccessory)?.label ?? "None" : "None";
@@ -148,6 +161,8 @@ const MagicMaker = () => {
     }
   }, [readyForCustomization, generationStatus]);
 
+=======
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
@@ -155,6 +170,7 @@ const MagicMaker = () => {
     }
   }, [navigate]);
 
+<<<<<<< HEAD
   const maleModels: ModelItem[] = [
     { src: "/src/gallery 3d models/character-knight.png", name: "Knight" },
     { src: "/src/gallery 3d models/character-superhero.png", name: "Superhero" },
@@ -212,11 +228,14 @@ const MagicMaker = () => {
 
   useEffect(() => { renderCrop(); }, [cropScale, cropOffset, cropOpen]);
 
+=======
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
   return (
     <div className="min-h-screen bg-[#0f172a] text-white flex flex-col">
       {/* Header */}
       <header className="w-full border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+<<<<<<< HEAD
           <div className="flex items-center gap-3">
             <button
               className="inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/15 px-4 py-2 text-sm border border-white/10 transition-colors"
@@ -230,14 +249,39 @@ const MagicMaker = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
+=======
+          <div className="text-3xl sm:text-4xl font-black tracking-[0.25em] italic">
+            <span className="bg-gradient-to-r from-fuchsia-300 via-white to-sky-300 bg-clip-text text-transparent drop-shadow-lg">AI-FORGE</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Profile avatar styled like a logo */}
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
             <div
               className="p-[2px] rounded-full bg-gradient-to-r from-fuchsia-500 via-violet-400 to-sky-400"
               title={user?.name || "Profile"}
             >
               <div className="h-10 w-10 rounded-full bg-[#0f172a] text-white flex items-center justify-center font-extrabold tracking-wide">
+<<<<<<< HEAD
                 {(user?.name || "U").split("@")[0].slice(0,1).toUpperCase()}
               </div>
             </div>
+=======
+                {(user?.name || "U").slice(0,1).toUpperCase()}
+              </div>
+            </div>
+            {/* replace Sign In with Logout since page is protected */}
+            <button
+              className="inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/15 px-4 py-2 text-sm border border-white/10 transition-colors"
+              onClick={() => {
+                localStorage.removeItem("auth_token");
+                localStorage.removeItem("auth_user");
+                window.location.href = "/";
+              }}
+            >
+              <LogIn className="h-4 w-4" />
+              Log Out
+            </button>
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
           </div>
         </div>
       </header>
@@ -282,6 +326,7 @@ const MagicMaker = () => {
                     const file = e.target.files?.[0];
                     if (file) {
                       const url = URL.createObjectURL(file);
+<<<<<<< HEAD
                       if (rawImageUrl) URL.revokeObjectURL(rawImageUrl);
                       setRawImageUrl(url);
                       setShowCharModal(true);
@@ -374,6 +419,13 @@ const MagicMaker = () => {
                     </div>
                   </div>
                 )}
+=======
+                      if (previewUrl) URL.revokeObjectURL(previewUrl);
+                      setPreviewUrl(url);
+                    }
+                  }}
+                />
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
                 <button
                   className="absolute bottom-3 right-3 inline-flex items-center gap-2 rounded-full bg-white text-[#0f172a] hover:bg-white/90 px-4 py-2 text-sm"
                   onClick={() => fileInputRef.current?.click()}
@@ -391,6 +443,7 @@ const MagicMaker = () => {
             {/* Right: Cartoon style card */}
             <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4 sm:p-6">
               <div className="relative aspect-square rounded-lg overflow-hidden bg-[#111827] flex items-center justify-center">
+<<<<<<< HEAD
                 {model ? (
                   <>
                     <img src={model.src} alt={model.name} className="w-full h-full object-cover" />
@@ -403,6 +456,17 @@ const MagicMaker = () => {
                   <button
                     className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20"
                     onClick={() => setModel(null)}
+=======
+                {modelUrl ? (
+                  <img src={modelUrl} alt="Selected model" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-white/70 text-sm">Cartoon model preview</div>
+                )}
+                {modelUrl && (
+                  <button
+                    className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20"
+                    onClick={() => setModelUrl(null)}
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
                     aria-label="Remove selected model"
                   >
                     <Trash className="h-4 w-4" />
@@ -433,6 +497,7 @@ const MagicMaker = () => {
                   <button className="text-white/70 hover:text-white" onClick={() => setPickerOpen(false)}>Close</button>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 max-h-[60vh] overflow-auto">
+<<<<<<< HEAD
                   {modelOptions.map((item) => (
                     <button
                       key={item.src}
@@ -444,6 +509,27 @@ const MagicMaker = () => {
                     >
                       <img src={item.src} alt={item.name} className="w-full h-40 object-cover" />
                       <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-2 py-1 text-center">{item.name}</div>
+=======
+                  {[
+                    "/src/gallery 3d models/character-knight.png",
+                    "/src/gallery 3d models/character-superhero.png",
+                    "/src/gallery 3d models/character-fairy.png",
+                    "/src/gallery 3d models/character-astronaut.png",
+                    "/src/gallery 3d models/opb.jpeg",
+                    "/src/gallery 3d models/boss_blbg.jpeg",
+                    "/src/gallery 3d models/moanabg.jpg",
+                    "/src/gallery 3d models/elsabg.jpeg",
+                  ].map((src) => (
+                    <button
+                      key={src}
+                      className="relative rounded-xl overflow-hidden border border-white/10 hover:border-white/30 focus:outline-none"
+                      onClick={() => {
+                        setModelUrl(src);
+                        setPickerOpen(false);
+                      }}
+                    >
+                      <img src={src} alt="model" className="w-full h-40 object-cover" />
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
                     </button>
                   ))}
                 </div>
@@ -451,6 +537,7 @@ const MagicMaker = () => {
             </div>
           )}
 
+<<<<<<< HEAD
           {/* Crop Modal */}
           {cropOpen && (
             <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -735,6 +822,16 @@ const MagicMaker = () => {
                 </div>
               </div>
             )}
+=======
+          {/* Action buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
+            <button className="w-full sm:w-auto rounded-full bg-yellow-400 hover:bg-yellow-300 text-black font-medium px-6 py-3 transition-colors">
+              Create 3D Model
+            </button>
+            <button className="w-full sm:w-auto rounded-full bg-white/10 hover:bg-white/15 border border-white/10 text-white font-medium px-6 py-3 transition-colors">
+              Customize Colors & Accessories
+            </button>
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
           </div>
 
           {/* Large 3D preview */}

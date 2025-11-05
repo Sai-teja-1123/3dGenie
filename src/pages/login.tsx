@@ -14,9 +14,15 @@ const LoginPage = () => {
   const [phone, setPhone] = useState("");
   const [otpSent, setOtpSent] = useState(false);
 
+<<<<<<< HEAD
   // Destination after login (default to homepage)
   const params = new URLSearchParams(location.search);
   const redirectTo = params.get("redirect") || "/";
+=======
+  // Destination after login (default to magic-maker)
+  const params = new URLSearchParams(location.search);
+  const redirectTo = params.get("redirect") || "/magic-maker";
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");

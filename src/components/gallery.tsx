@@ -5,10 +5,17 @@ const galleryImages = [
   { id: 2, src: "/src/gallery 3d models/character-superhero.png", title: "Superhero" },
   { id: 3, src: "/src/gallery 3d models/character-fairy.png", title: "Fairy" },
   { id: 4, src: "/src/gallery 3d models/character-astronaut.png", title: "Astronaut" },
+<<<<<<< HEAD
   { id: 7, src: "/src/gallery 3d models/moana_blue.jpeg", title: "Moana" },
   { id: 5, src: "/src/gallery 3d models/one_piece_blue.jpeg", title: "One Piece" },
   { id: 6, src: "/src/gallery 3d models/bossbaby-blue.jpeg", title: "Boss Baby" },
   { id: 8, src: "/src/gallery 3d models/snowwhite_blue.jpeg", title: "Snow White" },
+=======
+  { id: 7, src: "/src/gallery 3d models/moanabg.jpg", title: "Moana" },
+  { id: 5, src: "/src/gallery 3d models/opb.jpeg", title: "One Piece" },
+  { id: 6, src: "/src/gallery 3d models/boss_blbg.jpeg", title: "Boss Baby" },
+  { id: 8, src: "/src/gallery 3d models/elsabg.jpeg", title: "Elsa" },
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
 ];
 
 const Gallery = () => {

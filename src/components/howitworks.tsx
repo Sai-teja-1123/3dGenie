@@ -8,7 +8,11 @@ const steps = [
     title: "Upload",
     description: "Our user-friendly interface allows for quick setup, and our dedicated support team is ready to assist you every step of the way.",
     icon: Upload,
+<<<<<<< HEAD
     imageSrc: "/Screenshot 2025-11-04 155423.png", // from public folder
+=======
+    imageSrc: "/child.png", // place child.png in public/
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
   },
   {
     number: "02",
@@ -71,6 +75,7 @@ function StepCard({
       <div className="relative z-10 space-y-4">
         {step.imageSrc ? (
           <div className="w-full rounded-xl overflow-hidden">
+<<<<<<< HEAD
             <img
               src={step.imageSrc}
               alt={step.title}
@@ -79,6 +84,12 @@ function StepCard({
           </div>
         ) : index === 2 ? (
           <MiniModel3D heightClass="h-80" />
+=======
+            <img src={step.imageSrc} alt={step.title} className="w-full h-56 object-cover rounded-xl" />
+          </div>
+        ) : index === 2 ? (
+          <MiniModel3D />
+>>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
         ) : (
           <div className="w-16 h-16 bg-primary/20 rounded-xl flex items-center justify-center">
             <Icon className="w-8 h-8 text-primary" />
