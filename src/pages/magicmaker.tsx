@@ -1,9 +1,9 @@
 import ModelViewer3D from "@/components/ModelViewer3D";
-<<<<<<< HEAD
 import { Upload, ArrowLeft, Twitter, Instagram, Facebook, ShoppingBag, Trash, Sparkles, Palette } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaMale, FaFemale } from "react-icons/fa";
+import * as XLSX from "xlsx";
 
 type ColorPart = "hair" | "outfit" | "skin" | "shoes";
 
@@ -43,16 +43,10 @@ const accessoryOptions: AccessoryOption[] = [
 ];
 
 const colorPartsOrder: ColorPart[] = ["hair", "outfit", "skin", "shoes"];
-=======
-import { Upload, LogIn, Twitter, Instagram, Facebook, ShoppingBag, Trash } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
->>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
 
 const MagicMaker = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-<<<<<<< HEAD
   const cropCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const cropImgRef = useRef<HTMLImageElement | null>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -81,24 +75,20 @@ const MagicMaker = () => {
   });
   const [selectedAccessory, setSelectedAccessory] = useState<string | null>(null);
   const [customNotes, setCustomNotes] = useState("");
+  const [promptsMap, setPromptsMap] = useState<Map<string, string>>(new Map());
+  const [promptsLoaded, setPromptsLoaded] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState<"idle" | "running" | "done">("idle");
   const [generationMessage, setGenerationMessage] = useState("");
-=======
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [modelUrl, setModelUrl] = useState<string | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
->>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
   const user = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("auth_user") || "null"); } catch { return null; }
   }, []);
 
-<<<<<<< HEAD
   const readyForCustomization = Boolean(previewUrl && model);
   const estimatedSecondsLeft = generating ? Math.max(0, Math.ceil((100 - progress) * 0.35)) : 0;
   const selectedAccessoryLabel = selectedAccessory ? accessoryOptions.find((opt) => opt.id === selectedAccessory)?.label ?? "None" : "None";
-  const statusMessage = generationMessage || (readyForCustomization ? "Customize the colors and accessories, then create your 3D model." : "Upload a photo and choose a cartoon style to get started.");
+  const statusMessage = generationMessage || (readyForCustomization ? "Enter or review your prompt, then create your 3D model." : "Upload a photo and choose a cartoon style to get started.");
 
   const handleColorSelect = (part: ColorPart, color: string) => {
     setSelectedColors((prev) => ({ ...prev, [part]: color }));
@@ -161,8 +151,6 @@ const MagicMaker = () => {
     }
   }, [readyForCustomization, generationStatus]);
 
-=======
->>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
@@ -170,7 +158,137 @@ const MagicMaker = () => {
     }
   }, [navigate]);
 
-<<<<<<< HEAD
+  // Load prompts from Excel file
+  useEffect(() => {
+    const loadPrompts = async () => {
+      try {
+        const response = await fetch("/character-prompts.xlsx");
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet) as Array<Record<string, any>>;
+        
+        const map = new Map<string, string>();
+        
+        // Helper function to normalize model names for matching
+        const normalizeName = (name: string): string => {
+          return name
+            .toLowerCase()
+            .replace(/\s*-\s*/g, " ") // Replace hyphens with spaces
+            .replace(/\s+/g, " ") // Multiple spaces to single space
+            .trim();
+        };
+        
+        // Map to handle name variations between code and Excel
+        const nameVariations: Record<string, string[]> = {
+          "elsa": ["elsa", "elsa - frozen"],
+          "anna": ["anna", "anna- frozen"],
+          "ariel": ["ariel", "little mermaid"],
+          "belle": ["belle", "belle - beauty and the beast"],
+        };
+        
+        // Parse Excel data - handle BOY and GIRL columns
+        data.forEach((row) => {
+          // Process BOY column
+          const boyName = (row["BOY"] || row["Boy"] || "").toString().trim();
+          const boyPrompt = (row["PROMPT"] || "").toString().trim();
+          if (boyName && boyPrompt) {
+            const normalized = normalizeName(boyName);
+            map.set(normalized, boyPrompt);
+            // Also store original name for exact match
+            map.set(boyName.toLowerCase(), boyPrompt);
+          }
+          
+          // Process GIRL column
+          const girlName = (row["GIRL"] || row["Girl"] || "").toString().trim();
+          const girlPrompt = (row["PROMPT_1"] || row["PROMPT"] || "").toString().trim();
+          if (girlName && girlPrompt) {
+            const normalized = normalizeName(girlName);
+            map.set(normalized, girlPrompt);
+            // Also store original name for exact match
+            map.set(girlName.toLowerCase(), girlPrompt);
+          }
+        });
+        
+        // Add variations mapping
+        Object.entries(nameVariations).forEach(([baseName, variations]) => {
+          const prompt = map.get(baseName) || map.get(variations[0]);
+          if (prompt) {
+            variations.forEach(variation => {
+              if (!map.has(variation)) {
+                map.set(variation, prompt);
+              }
+            });
+          }
+        });
+        
+        setPromptsMap(map);
+        setPromptsLoaded(true);
+      } catch (error) {
+        console.error("Failed to load prompts from Excel:", error);
+        setPromptsLoaded(true); // Set to true even on error to prevent infinite retries
+      }
+    };
+    
+    loadPrompts();
+  }, []);
+
+  // Auto-populate prompt when model is selected
+  useEffect(() => {
+    if (model && promptsLoaded) {
+      const modelName = model.name;
+      
+      // Helper function to normalize model names for matching
+      const normalizeName = (name: string): string => {
+        return name
+          .toLowerCase()
+          .replace(/\s*-\s*/g, " ") // Replace hyphens with spaces
+          .replace(/\s+/g, " ") // Multiple spaces to single space
+          .trim();
+      };
+      
+      // Try exact match first
+      let prompt = promptsMap.get(modelName.toLowerCase());
+      
+      // Try normalized match
+      if (!prompt) {
+        const normalized = normalizeName(modelName);
+        prompt = promptsMap.get(normalized);
+      }
+      
+      // Handle specific name variations
+      const nameVariations: Record<string, string[]> = {
+        "elsa": ["elsa", "elsa - frozen"],
+        "anna": ["anna", "anna- frozen"],
+        "ariel": ["ariel", "little mermaid"],
+        "belle": ["belle", "belle - beauty and the beast"],
+      };
+      
+      if (!prompt) {
+        const lowerName = modelName.toLowerCase();
+        for (const [base, variations] of Object.entries(nameVariations)) {
+          if (variations.includes(lowerName) || lowerName === base) {
+            for (const variation of variations) {
+              prompt = promptsMap.get(variation);
+              if (prompt) break;
+            }
+            if (prompt) break;
+          }
+        }
+      }
+      
+      // Always populate prompt when model is selected
+      if (prompt) {
+        setCustomNotes(prompt);
+      } else {
+        // Default prompt for models not in Excel (include model name)
+        const defaultPrompt = `Create a 3D character model inspired by ${modelName}. Make it vibrant, playful, and suitable for children.`;
+        setCustomNotes(defaultPrompt);
+      }
+    }
+  }, [model, promptsLoaded, promptsMap]);
+
   const maleModels: ModelItem[] = [
     { src: "/src/gallery 3d models/character-knight.png", name: "Knight" },
     { src: "/src/gallery 3d models/character-superhero.png", name: "Superhero" },
@@ -228,14 +346,11 @@ const MagicMaker = () => {
 
   useEffect(() => { renderCrop(); }, [cropScale, cropOffset, cropOpen]);
 
-=======
->>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
   return (
     <div className="min-h-screen bg-[#0f172a] text-white flex flex-col">
       {/* Header */}
       <header className="w-full border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-<<<<<<< HEAD
           <div className="flex items-center gap-3">
             <button
               className="inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/15 px-4 py-2 text-sm border border-white/10 transition-colors"
@@ -245,43 +360,18 @@ const MagicMaker = () => {
               Back
             </button>
           <div className="text-3xl sm:text-4xl font-black tracking-[0.25em] italic">
-            <span className="bg-gradient-to-r from-fuchsia-300 via-white to-sky-300 bg-clip-text text-transparent drop-shadow-lg">AI-FORGE</span>
+            <span className="bg-gradient-to-r from-fuchsia-300 via-white to-sky-300 bg-clip-text text-transparent drop-shadow-lg">3DGENI</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
-=======
-          <div className="text-3xl sm:text-4xl font-black tracking-[0.25em] italic">
-            <span className="bg-gradient-to-r from-fuchsia-300 via-white to-sky-300 bg-clip-text text-transparent drop-shadow-lg">AI-FORGE</span>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Profile avatar styled like a logo */}
->>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
             <div
               className="p-[2px] rounded-full bg-gradient-to-r from-fuchsia-500 via-violet-400 to-sky-400"
               title={user?.name || "Profile"}
             >
               <div className="h-10 w-10 rounded-full bg-[#0f172a] text-white flex items-center justify-center font-extrabold tracking-wide">
-<<<<<<< HEAD
                 {(user?.name || "U").split("@")[0].slice(0,1).toUpperCase()}
               </div>
             </div>
-=======
-                {(user?.name || "U").slice(0,1).toUpperCase()}
-              </div>
-            </div>
-            {/* replace Sign In with Logout since page is protected */}
-            <button
-              className="inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/15 px-4 py-2 text-sm border border-white/10 transition-colors"
-              onClick={() => {
-                localStorage.removeItem("auth_token");
-                localStorage.removeItem("auth_user");
-                window.location.href = "/";
-              }}
-            >
-              <LogIn className="h-4 w-4" />
-              Log Out
-            </button>
->>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
           </div>
         </div>
       </header>
@@ -305,16 +395,33 @@ const MagicMaker = () => {
                   <div className="text-black/60 text-sm">Upload preview</div>
                 )}
                 {previewUrl && (
-                  <button
-                    className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-full bg-black/40 hover:bg-black/60 text-white"
-                    onClick={() => {
-                      if (previewUrl) URL.revokeObjectURL(previewUrl);
-                      setPreviewUrl(null);
-                    }}
-                    aria-label="Remove uploaded image"
-                  >
-                    <Trash className="h-4 w-4" />
-                  </button>
+                  <>
+                    <button
+                      className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-full bg-black/70 hover:bg-red-600/80 text-white transition-colors"
+                      onClick={() => {
+                        if (previewUrl) URL.revokeObjectURL(previewUrl);
+                        if (rawImageUrl) URL.revokeObjectURL(rawImageUrl);
+                        setPreviewUrl(null);
+                        setRawImageUrl(null);
+                        setGender("");
+                        setAge("");
+                        setModel(null);
+                        setCustomNotes("");
+                      }}
+                      aria-label="Remove uploaded image"
+                      title="Remove photo"
+                    >
+                      <Trash className="h-4 w-4" />
+                    </button>
+                    <button
+                      className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 hover:bg-black/90 text-white px-3 py-1.5 text-xs font-medium transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Change photo"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      Change
+                    </button>
+                  </>
                 )}
                 {/* Upload trigger inside the card */}
                 <input
@@ -326,7 +433,6 @@ const MagicMaker = () => {
                     const file = e.target.files?.[0];
                     if (file) {
                       const url = URL.createObjectURL(file);
-<<<<<<< HEAD
                       if (rawImageUrl) URL.revokeObjectURL(rawImageUrl);
                       setRawImageUrl(url);
                       setShowCharModal(true);
@@ -419,13 +525,6 @@ const MagicMaker = () => {
                     </div>
                   </div>
                 )}
-=======
-                      if (previewUrl) URL.revokeObjectURL(previewUrl);
-                      setPreviewUrl(url);
-                    }
-                  }}
-                />
->>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
                 <button
                   className="absolute bottom-3 right-3 inline-flex items-center gap-2 rounded-full bg-white text-[#0f172a] hover:bg-white/90 px-4 py-2 text-sm"
                   onClick={() => fileInputRef.current?.click()}
@@ -443,7 +542,6 @@ const MagicMaker = () => {
             {/* Right: Cartoon style card */}
             <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4 sm:p-6">
               <div className="relative aspect-square rounded-lg overflow-hidden bg-[#111827] flex items-center justify-center">
-<<<<<<< HEAD
                 {model ? (
                   <>
                     <img src={model.src} alt={model.name} className="w-full h-full object-cover" />
@@ -456,17 +554,6 @@ const MagicMaker = () => {
                   <button
                     className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20"
                     onClick={() => setModel(null)}
-=======
-                {modelUrl ? (
-                  <img src={modelUrl} alt="Selected model" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="text-white/70 text-sm">Cartoon model preview</div>
-                )}
-                {modelUrl && (
-                  <button
-                    className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20"
-                    onClick={() => setModelUrl(null)}
->>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
                     aria-label="Remove selected model"
                   >
                     <Trash className="h-4 w-4" />
@@ -497,7 +584,6 @@ const MagicMaker = () => {
                   <button className="text-white/70 hover:text-white" onClick={() => setPickerOpen(false)}>Close</button>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 max-h-[60vh] overflow-auto">
-<<<<<<< HEAD
                   {modelOptions.map((item) => (
                     <button
                       key={item.src}
@@ -505,31 +591,56 @@ const MagicMaker = () => {
                       onClick={() => {
                         setModel(item);
                         setPickerOpen(false);
+                        // Auto-populate prompt when model is selected
+                        if (promptsLoaded) {
+                          const normalizeName = (name: string): string => {
+                            return name
+                              .toLowerCase()
+                              .replace(/\s*-\s*/g, " ")
+                              .replace(/\s+/g, " ")
+                              .trim();
+                          };
+                          
+                          let prompt = promptsMap.get(item.name.toLowerCase());
+                          
+                          if (!prompt) {
+                            const normalized = normalizeName(item.name);
+                            prompt = promptsMap.get(normalized);
+                          }
+                          
+                          // Handle specific name variations
+                          const nameVariations: Record<string, string[]> = {
+                            "elsa": ["elsa", "elsa - frozen"],
+                            "anna": ["anna", "anna- frozen"],
+                            "ariel": ["ariel", "little mermaid"],
+                            "belle": ["belle", "belle - beauty and the beast"],
+                          };
+                          
+                          if (!prompt) {
+                            const lowerName = item.name.toLowerCase();
+                            for (const [base, variations] of Object.entries(nameVariations)) {
+                              if (variations.includes(lowerName) || lowerName === base) {
+                                for (const variation of variations) {
+                                  prompt = promptsMap.get(variation);
+                                  if (prompt) break;
+                                }
+                                if (prompt) break;
+                              }
+                            }
+                          }
+                          
+                          if (prompt) {
+                            setCustomNotes(prompt);
+                          } else {
+                            // Default prompt for models not in Excel (include model name)
+                            const defaultPrompt = `Create a 3D character model inspired by ${item.name}. Make it vibrant, playful, and suitable for children.`;
+                            setCustomNotes(defaultPrompt);
+                          }
+                        }
                       }}
                     >
                       <img src={item.src} alt={item.name} className="w-full h-40 object-cover" />
                       <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-2 py-1 text-center">{item.name}</div>
-=======
-                  {[
-                    "/src/gallery 3d models/character-knight.png",
-                    "/src/gallery 3d models/character-superhero.png",
-                    "/src/gallery 3d models/character-fairy.png",
-                    "/src/gallery 3d models/character-astronaut.png",
-                    "/src/gallery 3d models/opb.jpeg",
-                    "/src/gallery 3d models/boss_blbg.jpeg",
-                    "/src/gallery 3d models/moanabg.jpg",
-                    "/src/gallery 3d models/elsabg.jpeg",
-                  ].map((src) => (
-                    <button
-                      key={src}
-                      className="relative rounded-xl overflow-hidden border border-white/10 hover:border-white/30 focus:outline-none"
-                      onClick={() => {
-                        setModelUrl(src);
-                        setPickerOpen(false);
-                      }}
-                    >
-                      <img src={src} alt="model" className="w-full h-40 object-cover" />
->>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
                     </button>
                   ))}
                 </div>
@@ -537,7 +648,6 @@ const MagicMaker = () => {
             </div>
           )}
 
-<<<<<<< HEAD
           {/* Crop Modal */}
           {cropOpen && (
             <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -680,94 +790,22 @@ const MagicMaker = () => {
                 <Palette className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold">Customize Colors & Accessories</h3>
-                <p className="text-sm text-white/70">Pick colors, props, and special notes so the 3D artist knows exactly what to build.</p>
+                <h3 className="text-lg font-semibold">Enter Prompt</h3>
+                <p className="text-sm text-white/70">Select a model to auto-populate the prompt, or enter your own.</p>
               </div>
             </div>
 
             {readyForCustomization ? (
               <div className="space-y-8">
                 <section>
-                  <h4 className="text-sm font-semibold uppercase tracking-wide text-white/70 mb-3">Colors</h4>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {colorPartsOrder.map((part) => {
-                      const config = colorConfig[part];
-                      return (
-                        <div key={part} className="space-y-2 rounded-2xl bg-black/10 border border-white/10 p-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-white">{config.label}</span>
-                            <span className="text-xs text-white/60">{selectedColors[part]}</span>
-                          </div>
-                          <div className="flex gap-2 overflow-x-auto pb-1">
-                            {config.colors.map((color) => (
-                              <button
-                                key={color}
-                                type="button"
-                                onClick={() => handleColorSelect(part, color)}
-                                className={`h-11 w-11 rounded-full border-2 transition-transform ${selectedColors[part] === color ? "border-yellow-300 scale-105 shadow-lg shadow-yellow-300/40" : "border-transparent hover:scale-105"}`}
-                                style={{ backgroundColor: color }}
-                                aria-label={`${config.label} ${color}`}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-
-                <section>
-                  <h4 className="text-sm font-semibold uppercase tracking-wide text-white/70 mb-3">Accessories</h4>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {accessoryOptions.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => setSelectedAccessory((prev) => (prev === option.id ? null : option.id))}
-                        className={`rounded-2xl border px-4 py-3 text-left transition-all ${selectedAccessory === option.id ? "border-yellow-300 bg-white/15" : "border-white/10 bg-white/5 hover:border-white/30"}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <span className="text-2xl">{option.emoji}</span>
-                          <div>
-                            <div className="text-sm font-semibold text-white">{option.label}</div>
-                            <div className="text-xs text-white/60">{option.description}</div>
-                          </div>
-                        </div>
-            </button>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="grid sm:grid-cols-2 gap-6">
                   <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                    <h4 className="text-sm font-semibold text-white mb-2">Special Requests</h4>
+                    <h4 className="text-sm font-semibold text-white mb-2">Prompt</h4>
                     <textarea
                       value={customNotes}
                       onChange={(e) => setCustomNotes(e.target.value)}
-                      placeholder="Describe poses, expressions, background items, or favorite themes for your child."
-                      className="w-full min-h-[100px] rounded-xl border border-white/15 bg-[#0f172a]/60 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-300/40"
+                      placeholder="Prompt will be auto-populated when you select a model."
+                      className="w-full min-h-[200px] rounded-xl border border-white/15 bg-[#0f172a]/60 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-300/40"
                     />
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4 flex flex-col gap-3 text-sm text-white/80">
-                    <div>
-                      <h4 className="font-semibold text-white mb-2">Summary</h4>
-                      <ul className="space-y-1">
-                        {colorPartsOrder.map((part) => (
-                          <li key={part}>
-                            {colorConfig[part].label}: <span className="font-semibold" style={{ color: selectedColors[part] }}>{selectedColors[part]}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div>
-                      Accessory: <span className="font-semibold text-white">{selectedAccessoryLabel}</span>
-                    </div>
-                    <div className="text-white/60">
-                      {selectedAccessory ? accessoryOptions.find((opt) => opt.id === selectedAccessory)?.description : "Add an optional prop to the character."}
-                    </div>
-                    <div className="text-white/70">
-                      {customNotes ? `Notes: ${customNotes}` : "Share extra instructions to make the model perfect."}
-                    </div>
                   </div>
                 </section>
 
@@ -817,21 +855,11 @@ const MagicMaker = () => {
             ) : (
               <div className="h-full flex items-center justify-center rounded-xl border border-dashed border-white/15 bg-white/5 py-12 text-center text-white/60">
                 <div className="max-w-md mx-auto space-y-2">
-                  <p className="font-semibold text-white">Upload a picture and choose a cartoon model to unlock customization.</p>
-                  <p className="text-sm">Once a style is selected, you can recolor outfits, change hairstyles, and add props like balls, cars, wands, or pets.</p>
+                  <p className="font-semibold text-white">Upload a picture and choose a cartoon model to get started.</p>
+                  <p className="text-sm">The prompt will be auto-populated when you select a model.</p>
                 </div>
               </div>
             )}
-=======
-          {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
-            <button className="w-full sm:w-auto rounded-full bg-yellow-400 hover:bg-yellow-300 text-black font-medium px-6 py-3 transition-colors">
-              Create 3D Model
-            </button>
-            <button className="w-full sm:w-auto rounded-full bg-white/10 hover:bg-white/15 border border-white/10 text-white font-medium px-6 py-3 transition-colors">
-              Customize Colors & Accessories
-            </button>
->>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
           </div>
 
           {/* Large 3D preview */}
@@ -863,5 +891,4 @@ const MagicMaker = () => {
 };
 
 export default MagicMaker;
-
 

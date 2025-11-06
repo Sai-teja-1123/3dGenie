@@ -21,7 +21,7 @@ const Hero = () => {
           <div className="space-y-6">
             <h1 className="text-5xl lg:text-7xl font-bold leading-tight">
               Bring Your Ideas to Life
-              <span className="block text-primary mt-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">with AI Fordge</span>
+              <span className="block text-primary mt-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">with 3DGENI</span>
             </h1>
             
             <p className="text-xl text-muted-foreground">

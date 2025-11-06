@@ -15,7 +15,7 @@ GET /v1/jobs/:id
     <div className="min-h-screen bg-[#0f172a] text-white flex flex-col">
       <Navbar />
       <main className="container mx-auto px-6 pt-28 pb-16 space-y-6">
-        <h1 className="text-3xl sm:text-4xl font-extrabold">AI Forge API</h1>
+        <h1 className="text-3xl sm:text-4xl font-extrabold">3DGENI API</h1>
         <p className="text-white/80 max-w-3xl">Integrate 2D stylization and 3D character generation into your own apps. REST endpoints with API key authentication.</p>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">

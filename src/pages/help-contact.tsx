@@ -9,7 +9,7 @@ const ContactPage = () => (
       <div className="space-y-4 text-white/85">
         <p>Email: <a href="mailto:hello@aiforge.kids" className="underline">hello@aiforge.kids</a></p>
         <p>WhatsApp: +91-90000-00000</p>
-        <p>Address: AI Forge Labs, Hyderabad, Telangana</p>
+        <p>Address: 3DGENI Labs, Hyderabad, Telangana</p>
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
         <h2 className="font-semibold mb-2">Frontend reference</h2>

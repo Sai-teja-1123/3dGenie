@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
-const providers = [
-  { id: "google", label: "Continue with Google" },
-  { id: "phone", label: "Continue with Phone (OTP)" },
-];
-
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -14,15 +9,9 @@ const LoginPage = () => {
   const [phone, setPhone] = useState("");
   const [otpSent, setOtpSent] = useState(false);
 
-<<<<<<< HEAD
-  // Destination after login (default to homepage)
-  const params = new URLSearchParams(location.search);
-  const redirectTo = params.get("redirect") || "/";
-=======
   // Destination after login (default to magic-maker)
   const params = new URLSearchParams(location.search);
   const redirectTo = params.get("redirect") || "/magic-maker";
->>>>>>> 8fbf66df8942473647be6535d2d82aec5565e4dd
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -63,60 +52,25 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-white flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8 shadow-xl">
-        <h1 className="text-2xl font-semibold mb-6 text-center">Sign in to continue</h1>
-
-        <div className="space-y-3 mb-6">
-          <button onClick={onGoogle} className="w-full rounded-lg bg-white text-[#0f172a] hover:bg-white/90 py-2.5 font-medium transition-colors">
-            Continue with Google
+    <div className="h-screen bg-[#0f172a] text-white flex items-center justify-center px-2 py-1">
+      <div className="w-full max-w-xs bg-white/5 border border-white/10 rounded shadow p-2">
+        <h1 className="text-xs font-medium mb-1 text-center">Sign in</h1>
+        <div className="space-y-0.5">
+          <button onClick={onGoogle} className="w-full rounded bg-white text-[#0f172a] hover:bg-white/90 py-0.5 text-[10px] font-medium">
+            Google
           </button>
-          <form onSubmit={onEmailPasswordLogin} className="space-y-3">
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg bg-white/10 border border-white/10 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/30"
-              required
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg bg-white/10 border border-white/10 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/30"
-              required
-            />
-            <button type="submit" className="w-full rounded-lg bg-primary hover:bg-primary/90 py-2.5 font-medium transition-colors">
-              Continue with Email
-            </button>
+          <form onSubmit={onEmailPasswordLogin} className="space-y-0.5">
+            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded bg-white/10 border border-white/10 px-1.5 py-0.5 text-[10px] focus:outline-none" required />
+            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded bg-white/10 border border-white/10 px-1.5 py-0.5 text-[10px] focus:outline-none" required />
+            <button type="submit" className="w-full rounded bg-primary hover:bg-primary/90 py-0.5 text-[10px] font-medium">Email</button>
           </form>
-          <div className="h-px bg-white/10 my-4" />
-          <form onSubmit={otpSent ? onVerifyOtp : onSendOtp} className="space-y-3">
-            <input
-              type="tel"
-              placeholder="Phone number"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full rounded-lg bg-white/10 border border-white/10 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/30"
-            />
-            {otpSent && (
-              <input
-                type="text"
-                placeholder="Enter OTP"
-                className="w-full rounded-lg bg-white/10 border border-white/10 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/30"
-              />
-            )}
-            <button type="submit" className="w-full rounded-lg bg-white/10 hover:bg-white/15 py-2.5 font-medium border border-white/10 transition-colors">
-              {otpSent ? "Verify OTP" : "Send OTP"}
-            </button>
+          <div className="h-px bg-white/10 my-0.5" />
+          <form onSubmit={otpSent ? onVerifyOtp : onSendOtp} className="space-y-0.5">
+            <input type="tel" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full rounded bg-white/10 border border-white/10 px-1.5 py-0.5 text-[10px] focus:outline-none" />
+            {otpSent && <input type="text" placeholder="OTP" className="w-full rounded bg-white/10 border border-white/10 px-1.5 py-0.5 text-[10px] focus:outline-none" />}
+            <button type="submit" className="w-full rounded bg-white/10 hover:bg-white/15 py-0.5 text-[10px] font-medium border border-white/10">{otpSent ? "Verify" : "Send OTP"}</button>
           </form>
         </div>
-
-        <p className="text-xs text-white/60 text-center">
-          This is a demo sign-in experience. Replace with real auth later.
-        </p>
       </div>
     </div>
   );
