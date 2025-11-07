@@ -4,6 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaMale, FaFemale } from "react-icons/fa";
 import * as XLSX from "xlsx";
+import {
+  generate3DModel,
+  pollJobStatus,
+  getResultFileUrl,
+  ApiError,
+} from "@/services/api";
+import { Download } from "lucide-react";
 
 type ColorPart = "hair" | "outfit" | "skin" | "shoes";
 
@@ -79,8 +86,11 @@ const MagicMaker = () => {
   const [promptsLoaded, setPromptsLoaded] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [generationStatus, setGenerationStatus] = useState<"idle" | "running" | "done">("idle");
+  const [generationStatus, setGenerationStatus] = useState<"idle" | "running" | "done" | "error">("idle");
   const [generationMessage, setGenerationMessage] = useState("");
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [resultFiles, setResultFiles] = useState<string[]>([]);
+  const [resultModelUrl, setResultModelUrl] = useState<string | null>(null);
   const user = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("auth_user") || "null"); } catch { return null; }
   }, []);
@@ -94,7 +104,7 @@ const MagicMaker = () => {
     setSelectedColors((prev) => ({ ...prev, [part]: color }));
   };
 
-  const startGeneration = () => {
+  const startGeneration = async () => {
     if (!readyForCustomization) {
       setGenerationMessage("Upload a photo and pick a model to start generating.");
       return;
@@ -102,30 +112,142 @@ const MagicMaker = () => {
     if (generating) {
       return;
     }
+
+    if (!previewUrl) {
+      setGenerationMessage("Please upload an image first.");
+      return;
+    }
+
     setGenerationStatus("running");
-    setGenerationMessage("Generating your 3D model...");
+    setGenerationMessage("Uploading image and starting generation...");
     setGenerating(true);
     setProgress(0);
+    setResultFiles([]);
+    setResultModelUrl(null);
+
+    // Clear any existing interval
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
     }
-    progressIntervalRef.current = setInterval(() => {
-      setProgress((prev) => {
-        const increment = Math.min(100 - prev, Math.floor(Math.random() * 6) + 2);
-        const next = prev + increment;
-        if (next >= 100) {
-          if (progressIntervalRef.current) {
-            clearInterval(progressIntervalRef.current);
-            progressIntervalRef.current = null;
+
+    try {
+      // Convert preview URL to File
+      const response = await fetch(previewUrl);
+      const blob = await response.blob();
+      const file = new File([blob], "uploaded-image.jpg", { type: blob.type });
+
+      // Start generation
+      setGenerationMessage("Submitting generation request...");
+      const jobResponse = await generate3DModel(file, 50);
+
+      setCurrentJobId(jobResponse.job_id);
+      setGenerationMessage(`Job created! Job ID: ${jobResponse.job_id.substring(0, 8)}...`);
+
+      // Poll for status
+      setGenerationMessage("Processing your 3D model... This may take a few minutes.");
+      
+      const result = await pollJobStatus(
+        jobResponse.job_id,
+        (progressValue, status) => {
+          setProgress(progressValue);
+          if (status === "processing" || status === "queued") {
+            setGenerationMessage(`Processing... ${Math.round(progressValue)}%`);
           }
-          setGenerating(false);
-          setGenerationStatus("done");
+        },
+        2000, // Poll every 2 seconds
+        600000 // 10 minute timeout
+      );
+
+      // Generation completed
+      setProgress(100);
+      setGenerating(false);
+      setGenerationStatus("done");
+      
+      if (result.result_files && result.result_files.length > 0) {
+        setResultFiles(result.result_files);
+        
+        // Find GLB/OBJ files for 3D model display
+        const modelFile = result.result_files.find(
+          (f) => f.endsWith(".glb") || f.endsWith(".obj")
+        );
+        
+        if (modelFile) {
+          const modelUrl = getResultFileUrl(jobResponse.job_id, modelFile);
+          setResultModelUrl(modelUrl);
           setGenerationMessage("Your 3D model is ready! Scroll down to preview.");
-          return 100;
+        } else {
+          // If no 3D file, show images
+          const imageFile = result.result_files.find(
+            (f) => f.endsWith(".png") || f.endsWith(".jpg") || f.endsWith(".jpeg")
+          );
+          if (imageFile) {
+            const imageUrl = getResultFileUrl(jobResponse.job_id, imageFile);
+            setResultModelUrl(imageUrl);
+            setGenerationMessage("Generation completed! Check the preview below.");
+          } else {
+            setGenerationMessage("Generation completed! Files are ready for download.");
+          }
         }
-        return next;
-      });
-    }, 600);
+      } else {
+        setGenerationMessage("Generation completed, but no output files found.");
+      }
+    } catch (error) {
+      console.error("Generation error:", error);
+      setGenerating(false);
+      setGenerationStatus("error");
+      
+      if (error instanceof ApiError) {
+        const errorMsg = error.message.toLowerCase();
+        // Check for model-related errors
+        const isModelError = 
+          errorMsg.includes("model") ||
+          errorMsg.includes("does not exist") ||
+          errorMsg.includes("node") && errorMsg.includes("not found") ||
+          errorMsg.includes("file not found") ||
+          errorMsg.includes("missing") ||
+          errorMsg.includes("cannot execute");
+        
+        if (isModelError) {
+          setGenerationMessage(
+            `Models not installed: ${error.message}. Please install the required models in ComfyUI. See backend/MODELS_SETUP.md for instructions.`
+          );
+        } else if (error.statusCode === 503) {
+          setGenerationMessage(
+            `Backend service unavailable: ${error.message}. Please ensure ComfyUI is running and accessible.`
+          );
+        } else {
+          setGenerationMessage(
+            `Error: ${error.message}`
+          );
+        }
+      } else {
+        const errorMsg = error instanceof Error ? error.message : "Unknown error";
+        const lowerMsg = errorMsg.toLowerCase();
+        
+        // Check for model-related errors in generic errors too
+        const isModelError = 
+          lowerMsg.includes("model") ||
+          lowerMsg.includes("does not exist") ||
+          lowerMsg.includes("node") && lowerMsg.includes("not found");
+        
+        if (isModelError) {
+          setGenerationMessage(
+            `Models not installed: ${errorMsg}. Please install the required models in ComfyUI. See backend/MODELS_SETUP.md for instructions.`
+          );
+        } else {
+          setGenerationMessage(
+            `An error occurred: ${errorMsg}`
+          );
+        }
+      }
+      
+      // Clear interval if still running
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    }
   };
 
   useEffect(() => {
@@ -827,10 +949,31 @@ const MagicMaker = () => {
                       className={`w-full inline-flex items-center justify-center rounded-2xl px-5 py-3 font-semibold transition-all ${readyForCustomization ? "bg-yellow-400 text-[#0f172a] hover:bg-yellow-300" : "bg-white/10 text-white/40 cursor-not-allowed"} ${generating ? "animate-pulse" : ""}`}
                     >
                       {generating ? "Creating model..." : "Create 3D Model"}
-            </button>
-                    <div className="rounded-xl bg-black/40 border border-white/10 p-3 text-xs text-white/70 space-y-2">
-                      <div className="font-semibold text-white">Status</div>
-                      <p>{statusMessage}</p>
+                    </button>
+                    {!readyForCustomization && (
+                      <p className="text-xs text-white/50 text-center mt-1">
+                        Note: Models must be installed in ComfyUI for generation to work
+                      </p>
+                    )}
+                    <div className={`rounded-xl border p-3 text-xs space-y-2 ${
+                      generationStatus === "error" 
+                        ? "bg-red-500/10 border-red-500/30 text-red-200" 
+                        : "bg-black/40 border-white/10 text-white/70"
+                    }`}>
+                      <div className={`font-semibold ${generationStatus === "error" ? "text-red-300" : "text-white"}`}>
+                        Status
+                      </div>
+                      <p className={generationStatus === "error" ? "text-red-200" : ""}>{statusMessage}</p>
+                      {generationStatus === "error" && (
+                        <div className="mt-2 p-2 bg-red-500/20 border border-red-500/30 rounded-lg text-[11px]">
+                          <div className="font-semibold mb-1">Missing Models?</div>
+                          <div className="text-red-200/80">
+                            Generation requires models to be installed in ComfyUI. Check{" "}
+                            <code className="bg-black/30 px-1 rounded">backend/MODELS_SETUP.md</code>{" "}
+                            for setup instructions.
+                          </div>
+                        </div>
+                      )}
                       {(generating || progress > 0) && (
                         <>
                           <div className="flex items-center justify-between text-[11px] text-white/50">
@@ -865,8 +1008,37 @@ const MagicMaker = () => {
           {/* Large 3D preview */}
           <div className="rounded-xl bg-white/[0.06] border border-white/10 p-2 sm:p-4">
             <div className="aspect-[16/10] rounded-lg overflow-hidden bg-black/60">
-              <ModelViewer3D />
+              {resultModelUrl && (resultModelUrl.endsWith('.glb') || resultModelUrl.endsWith('.obj')) ? (
+                <ModelViewer3D modelUrl={resultModelUrl} />
+              ) : resultModelUrl ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <img 
+                    src={resultModelUrl} 
+                    alt="Generated result" 
+                    className="max-w-full max-h-full object-contain"
+                  />
+                </div>
+              ) : (
+                <ModelViewer3D />
+              )}
             </div>
+            {resultFiles.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <div className="text-sm font-semibold text-white">Generated Files:</div>
+                <div className="flex flex-wrap gap-2">
+                  {resultFiles.map((file, idx) => (
+                    <a
+                      key={idx}
+                      href={currentJobId ? getResultFileUrl(currentJobId, file) : '#'}
+                      download
+                      className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded px-3 py-1.5 text-white/80 hover:text-white transition-colors"
+                    >
+                      {file.split('/').pop()}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
