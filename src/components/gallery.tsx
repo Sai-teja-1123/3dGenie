@@ -1,3 +1,4 @@
+import { memo } from "react";
 import GalleryImageCard from "./GalleryImageCard";
 
 const galleryImages = [
@@ -11,7 +12,7 @@ const galleryImages = [
   { id: 8, src: "/src/gallery 3d models/snowwhite_blue.jpeg", title: "Snow White" },
 ];
 
-const Gallery = () => {
+const Gallery = memo(() => {
   // No categories; static reference images
 
   return (
@@ -34,6 +35,8 @@ const Gallery = () => {
       </div>
     </section>
   );
-};
+});
+
+Gallery.displayName = 'Gallery';
 
 export default Gallery;

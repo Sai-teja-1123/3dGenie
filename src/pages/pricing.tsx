@@ -8,21 +8,51 @@ const plans = [
     title: "Starter",
     price: 0,
     period: "month",
-    features: ["1 model preview", "Low-res export", "Email support"],
+    features: [
+      "5 AI-generated 3D models per month",
+      "Basic 2D to 3D conversion",
+      "Standard resolution exports (720p)",
+      "Email support (48hr response)",
+      "Watermarked outputs",
+      "Personal use only"
+    ],
     popular: false,
   },
   {
     title: "Pro",
     price: 499,
     period: "month",
-    features: ["Unlimited previews", "HD export", "Priority support"],
+    features: [
+      "Unlimited AI-generated 3D models",
+      "Advanced 2D to 3D conversion",
+      "High-resolution exports (4K)",
+      "Priority support (24hr response)",
+      "No watermarks",
+      "Commercial license included",
+      "Custom character creation",
+      "Multiple export formats (OBJ, FBX, GLTF)",
+      "Cloud storage (50GB)"
+    ],
     popular: true,
   },
   {
     title: "Studio",
     price: 1499,
     period: "month",
-    features: ["Team seats", "Commercial license", "Dedicated support"],
+    features: [
+      "Everything in Pro, plus:",
+      "Up to 10 team member seats",
+      "Dedicated account manager",
+      "API access for integration",
+      "Custom workflow automation",
+      "Ultra HD exports (8K)",
+      "Unlimited cloud storage",
+      "White-label options",
+      "Advanced animation tools",
+      "Priority rendering queue",
+      "Custom training on your data",
+      "SLA guarantee (99.9% uptime)"
+    ],
     popular: false,
   },
 ];
@@ -33,6 +63,11 @@ const PricingPage = () => {
   const location = useLocation();
   const [checkoutOpen, setCheckoutOpen] = useState<boolean>(false);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "netbanking" | "upi">("card");
+
+  // Login redirect states
+  const [showLoginHint, setShowLoginHint] = useState<boolean>(false);
+  const [redirectCountdown, setRedirectCountdown] = useState<number>(3);
+  const [isRedirecting, setIsRedirecting] = useState<boolean>(false);
 
   // Card fields
   const [cardName, setCardName] = useState("");
@@ -54,11 +89,42 @@ const PricingPage = () => {
 
   const handleSelectPlan = (title: string) => {
     if (!isLoggedIn()) {
-      navigate(`/login?redirect=/pricing?plan=${encodeURIComponent(title)}`);
+      // Show login hint and start countdown
+      setSelected(title);
+      setShowLoginHint(true);
+      setIsRedirecting(true);
+      setRedirectCountdown(3);
+
+      // Store interval and timeout IDs for cleanup
+      let countdownInterval: NodeJS.Timeout;
+      let redirectTimeout: NodeJS.Timeout;
+
+      // Countdown timer
+      countdownInterval = setInterval(() => {
+        setRedirectCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(countdownInterval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Redirect after 3 seconds
+      redirectTimeout = setTimeout(() => {
+        navigate(`/login?redirect=/pricing?plan=${encodeURIComponent(title)}`);
+      }, 3000);
+
       return;
     }
     setSelected(title);
     setCheckoutOpen(true);
+  };
+
+  const cancelRedirect = () => {
+    setShowLoginHint(false);
+    setIsRedirecting(false);
+    setRedirectCountdown(3);
   };
 
   const canPay = () => {
@@ -93,8 +159,56 @@ const PricingPage = () => {
   }, [location.search]);
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-white">
+    <div className="min-h-screen bg-[#0f172a] text-white relative">
       <Navbar />
+
+      {/* Login Hint Notification - Animated from top */}
+      {showLoginHint && (
+        <div
+          className={`fixed top-0 left-0 right-0 z-50 transition-all duration-1000 ease-out ${
+            isRedirecting ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
+          }`}
+          style={{
+            animation: isRedirecting ? 'slideDownFromTop 1s ease-out forwards' : 'none'
+          }}
+        >
+          <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white py-6 px-6 shadow-2xl">
+            <div className="container mx-auto max-w-2xl text-center">
+              <div className="flex items-center justify-center gap-3 mb-3">
+                <svg className="w-8 h-8 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <h2 className="text-2xl font-bold">Login Required</h2>
+              </div>
+              <p className="text-lg mb-4">
+                Please login first to select the <span className="font-bold text-yellow-300">{selected}</span> plan
+              </p>
+              <div className="flex items-center justify-center gap-2 text-xl font-semibold">
+                <span>Redirecting to login page in</span>
+                <span className="inline-flex items-center justify-center w-12 h-12 bg-white text-purple-600 rounded-full text-2xl font-bold animate-pulse">
+                  {redirectCountdown}
+                </span>
+                <span>seconds...</span>
+              </div>
+              <div className="mt-4">
+                <div className="w-full bg-white/30 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-white h-full rounded-full transition-all duration-1000 ease-linear"
+                    style={{ width: `${((3 - redirectCountdown) / 3) * 100}%` }}
+                  />
+                </div>
+              </div>
+              <button
+                onClick={cancelRedirect}
+                className="mt-4 px-6 py-2 bg-white/20 hover:bg-white/30 rounded-lg font-semibold transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="container mx-auto px-6 pt-28 pb-16">
         <h1 className="text-center text-3xl sm:text-4xl font-extrabold mb-10">Choose the plan that's right for you</h1>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

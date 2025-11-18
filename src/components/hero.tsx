@@ -1,9 +1,24 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
-import ModelViewer3D from "./ModelViewer3D";
+import { lazy, Suspense, memo } from "react";
 
-const Hero = () => {
+// Lazy load the 3D model component
+const ModelViewer3D = lazy(() => import("./ModelViewer3D"));
+
+// Loading fallback component
+const ModelLoadingFallback = () => (
+  <div className="w-full h-full flex items-center justify-center">
+    <div className="relative">
+      <div className="w-32 h-32 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-20 h-20 bg-primary/20 rounded-full animate-pulse"></div>
+      </div>
+    </div>
+  </div>
+);
+
+const Hero = memo(() => {
   const navigate = useNavigate();
   return (
     <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
@@ -63,7 +78,9 @@ const Hero = () => {
             {/* Main Container with Enhanced Styling */}
             <div className="relative z-10 w-full max-w-xl mx-auto aspect-square bg-gradient-to-br from-primary/15 via-transparent to-accent/10 rounded-full flex items-center justify-center border border-primary/20 shadow-2xl shadow-primary/20">
               <div className="w-full h-full rounded-full overflow-hidden">
-                <ModelViewer3D />
+                <Suspense fallback={<ModelLoadingFallback />}>
+                  <ModelViewer3D />
+                </Suspense>
               </div>
             </div>
             
@@ -77,6 +94,8 @@ const Hero = () => {
       </div>
     </section>
   );
-};
+});
+
+Hero.displayName = 'Hero';
 
 export default Hero;

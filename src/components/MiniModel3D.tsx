@@ -1,41 +1,123 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, memo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useTexture } from "@react-three/drei";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import * as THREE from "three";
 
-function AutoRotate({ children }: { children: React.ReactNode }) {
+const AutoRotate = memo(({ children }: { children: React.ReactNode }) => {
   const ref = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
     if (ref.current) ref.current.rotation.y += delta * 0.6;
   });
   return <group ref={ref}>{children}</group>;
-}
+});
 
-function CharacterModel() {
+AutoRotate.displayName = 'AutoRotate';
+
+const CharacterModel = memo(() => {
   const [object3d, setObject3d] = useState<THREE.Group | null>(null);
   const [loading, setLoading] = useState(true);
-  const texture = useTexture("/tripo_image_116fd530-8f07-4d68-8c46-278b55d2d11f_0.jpg");
 
   useEffect(() => {
+    let isMounted = true;
+    const loadedTextures: THREE.Texture[] = [];
+    const loadedMaterials: THREE.Material[] = [];
+    
+    const textureLoader = new THREE.TextureLoader();
     const loader = new OBJLoader();
+    
     loader.load(
       "/tripo_convert_116fd530-8f07-4d68-8c46-278b55d2d11f.obj",
       (object) => {
-        object.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            child.material = new THREE.MeshStandardMaterial({ map: texture });
+        if (!isMounted) {
+          object.traverse((child: THREE.Object3D) => {
+            if (child instanceof THREE.Mesh) {
+              child.geometry.dispose();
+              if (Array.isArray(child.material)) {
+                child.material.forEach(mat => mat.dispose());
+              } else {
+                child.material.dispose();
+              }
+            }
+          });
+          return;
+        }
+
+        textureLoader.load(
+          "/tripo_image_116fd530-8f07-4d68-8c46-278b55d2d11f_0.jpg",
+          (texture) => {
+            if (!isMounted) {
+              texture.dispose();
+              return;
+            }
+            
+            loadedTextures.push(texture);
+            
+            object.traverse((child: THREE.Object3D) => {
+              if (child instanceof THREE.Mesh) {
+                const material = new THREE.MeshStandardMaterial({ 
+                  map: texture,
+                  roughness: 0.6,
+                  metalness: 0.0
+                });
+                loadedMaterials.push(material);
+                child.material = material;
+              }
+            });
+            
+            object.scale.setScalar(2.2);
+            object.position.set(0, 0.05, 0);
+            
+            if (isMounted) {
+              setObject3d(object);
+              setLoading(false);
+            }
+          },
+          undefined,
+          (error) => {
+            console.error('Error loading texture:', error);
+            if (isMounted) {
+              setLoading(false);
+            }
           }
-        });
-        object.scale.setScalar(2.2);
-        object.position.set(0, 0.05, 0);
-        setObject3d(object);
-        setLoading(false);
+        );
       },
       undefined,
-      () => setLoading(false)
+      (error) => {
+        console.error('Error loading model:', error);
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
     );
-  }, [texture]);
+
+    return () => {
+      isMounted = false;
+      
+      // Dispose all loaded textures
+      loadedTextures.forEach(texture => {
+        texture.dispose();
+      });
+      
+      // Dispose all loaded materials
+      loadedMaterials.forEach(material => {
+        material.dispose();
+      });
+      
+      // Dispose model if it exists
+      if (object3d) {
+        object3d.traverse((child: THREE.Object3D) => {
+          if (child instanceof THREE.Mesh) {
+            child.geometry.dispose();
+            if (Array.isArray(child.material)) {
+              child.material.forEach(mat => mat.dispose());
+            } else {
+              child.material.dispose();
+            }
+          }
+        });
+      }
+    };
+  }, []);
 
   if (loading || !object3d) {
     return (
@@ -53,20 +135,34 @@ function CharacterModel() {
       <primitive object={object3d} />
     </AutoRotate>
   );
-}
+});
 
-const MiniModel3D = ({ heightClass = "h-56" }: { heightClass?: string }) => {
+CharacterModel.displayName = 'CharacterModel';
+
+const MiniModel3D = memo(({ heightClass = "h-56" }: { heightClass?: string }) => {
   return (
     <div className={`w-full ${heightClass} rounded-xl overflow-hidden bg-black/50`}>
-      <Canvas camera={{ position: [0, 0.8, 2.4], fov: 45 }} style={{ width: "100%", height: "100%" }}>
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[2, 3, 2]} intensity={1.2} />
-        <directionalLight position={[-2, 2, 1]} intensity={0.8} color="#ffdcb2" />
+      <Canvas 
+        camera={{ position: [0, 0.8, 2.4], fov: 45 }} 
+        style={{ width: "100%", height: "100%" }}
+        gl={{ 
+          antialias: true,
+          powerPreference: 'high-performance'
+        }}
+        dpr={[1, 2]}
+        frameloop="always"
+        performance={{ min: 0.5 }}
+      >
+        {/* Optimized lighting - reduced from 3 to 2 lights */}
+        <ambientLight intensity={0.7} />
+        <directionalLight position={[2, 3, 2]} intensity={1.3} />
         <CharacterModel />
       </Canvas>
     </div>
   );
-};
+});
+
+MiniModel3D.displayName = 'MiniModel3D';
 
 export default MiniModel3D;
 

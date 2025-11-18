@@ -3,12 +3,14 @@ import Index from "./pages/index";
 import NotFound from "./pages/notfound";
 import MagicMaker from "./pages/magicmaker";
 import LoginPage from "./pages/login";
+import PricingPage from "./pages/pricing";
 
 const App = () => (
   <BrowserRouter>
     <Routes>
       <Route path="/" element={<Index />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/pricing" element={<PricingPage />} />
       <Route path="/magic-maker" element={<MagicMaker />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

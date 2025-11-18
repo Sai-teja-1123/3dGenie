@@ -1,12 +1,11 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, memo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useTexture } from '@react-three/drei';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 
 // Component for rotating the model
-function RotatingModel({ children }: { children: React.ReactNode }) {
+const RotatingModel = memo(({ children }: { children: React.ReactNode }) => {
   const groupRef = useRef<THREE.Group>(null);
 
   useFrame((state, delta) => {
@@ -16,53 +15,106 @@ function RotatingModel({ children }: { children: React.ReactNode }) {
   });
 
   return <group ref={groupRef}>{children}</group>;
-}
+});
+
+RotatingModel.displayName = 'RotatingModel';
 
 // Component for the anime character model
-function AnimeCharacter({ modelUrl }: { modelUrl?: string | null }) {
+const AnimeCharacter = memo(({ modelUrl }: { modelUrl?: string | null }) => {
   const meshRef = useRef<THREE.Group>(null);
   const [model, setModel] = useState<THREE.Group | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Use default texture if no model URL provided
-  const defaultTexture = useTexture('/tripo_image_116fd530-8f07-4d68-8c46-278b55d2d11f_0.jpg');
 
   useEffect(() => {
+    let isMounted = true;
+    const loadedTextures: THREE.Texture[] = [];
+    const loadedMaterials: THREE.Material[] = [];
+    
+    const textureLoader = new THREE.TextureLoader();
+    
+    const loadDefaultModel = () => {
+      const loader = new OBJLoader();
+      loader.load(
+        '/tripo_convert_116fd530-8f07-4d68-8c46-278b55d2d11f.obj',
+        (object) => {
+          if (!isMounted) {
+            object.traverse((child: THREE.Object3D) => {
+              if (child instanceof THREE.Mesh) {
+                child.geometry.dispose();
+                if (Array.isArray(child.material)) {
+                  child.material.forEach(mat => mat.dispose());
+                } else {
+                  child.material.dispose();
+                }
+              }
+            });
+            return;
+          }
+
+          textureLoader.load(
+            '/tripo_image_116fd530-8f07-4d68-8c46-278b55d2d11f_0.jpg',
+            (texture) => {
+              if (!isMounted) {
+                texture.dispose();
+                return;
+              }
+              
+              loadedTextures.push(texture);
+              
+              object.traverse((child: THREE.Object3D) => {
+                if (child instanceof THREE.Mesh) {
+                  const material = new THREE.MeshStandardMaterial({ 
+                    map: texture,
+                    roughness: 0.6,
+                    metalness: 0.0,
+                    emissive: new THREE.Color(0x111111),
+                    emissiveIntensity: 0.1,
+                    side: THREE.DoubleSide,
+                    flatShading: false
+                  });
+                  loadedMaterials.push(material);
+                  child.material = material;
+                }
+              });
+              object.scale.setScalar(3.5);
+              object.position.set(0, 0.1, 0);
+              
+              if (isMounted) {
+                setModel(object);
+                setLoading(false);
+              }
+            },
+            undefined,
+            (error) => {
+              console.error('Error loading texture:', error);
+              if (isMounted) {
+                setLoading(false);
+              }
+            }
+          );
+        },
+        undefined,
+        (error) => {
+          console.error('Error loading default OBJ:', error);
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
+      );
+    };
+
     setLoading(true);
     setError(null);
     
     // If no model URL, use default model
     if (!modelUrl) {
-      const loader = new OBJLoader();
-      loader.load(
-        '/tripo_convert_116fd530-8f07-4d68-8c46-278b55d2d11f.obj',
-        (object) => {
-          object.traverse((child) => {
-            if (child instanceof THREE.Mesh) {
-              child.material = new THREE.MeshStandardMaterial({ 
-                map: defaultTexture,
-                roughness: 0.6,
-                metalness: 0.0,
-                emissive: new THREE.Color(0x111111),
-                emissiveIntensity: 0.1,
-                side: THREE.DoubleSide,
-                flatShading: false
-              });
-            }
-          });
-          object.scale.setScalar(3.5);
-          object.position.set(0, 0.1, 0);
-          setModel(object);
-          setLoading(false);
-        },
-        undefined,
-        (error) => {
-          console.error('Error loading default OBJ:', error);
-          setLoading(false);
-        }
-      );
-      return;
+      loadDefaultModel();
+      return () => {
+        isMounted = false;
+        loadedTextures.forEach(tex => tex.dispose());
+        loadedMaterials.forEach(mat => mat.dispose());
+      };
     }
 
     // Load model from URL - support both OBJ and GLB
@@ -72,6 +124,8 @@ function AnimeCharacter({ modelUrl }: { modelUrl?: string | null }) {
     loader.load(
       modelUrl,
       (loaded) => {
+        if (!isMounted) return;
+        
         // Handle GLB format (GLTFLoader returns { scene, animations, etc })
         const object = isGLB ? (loaded as any).scene : loaded as THREE.Group;
         
@@ -79,7 +133,7 @@ function AnimeCharacter({ modelUrl }: { modelUrl?: string | null }) {
         const baseUrl = modelUrl.substring(0, modelUrl.lastIndexOf('/'));
         const baseName = modelUrl.substring(modelUrl.lastIndexOf('/') + 1).replace(/\.(obj|glb)$/i, '');
         
-        object.traverse((child) => {
+        object.traverse((child: THREE.Object3D) => {
           if (child instanceof THREE.Mesh) {
             // GLB files usually have materials embedded, but we can try to enhance them
             if (isGLB && child.material) {
@@ -92,13 +146,18 @@ function AnimeCharacter({ modelUrl }: { modelUrl?: string | null }) {
               }
             } else {
               // For OBJ files, try to load texture
-              const textureLoader = new THREE.TextureLoader();
               const textureUrl = `${baseUrl}/${baseName}_0.jpg`;
               
               textureLoader.load(
                 textureUrl,
                 (texture) => {
-                  child.material = new THREE.MeshStandardMaterial({ 
+                  if (!isMounted) {
+                    texture.dispose();
+                    return;
+                  }
+                  
+                  loadedTextures.push(texture);
+                  const material = new THREE.MeshStandardMaterial({ 
                     map: texture,
                     roughness: 0.6,
                     metalness: 0.0,
@@ -107,11 +166,15 @@ function AnimeCharacter({ modelUrl }: { modelUrl?: string | null }) {
                     side: THREE.DoubleSide,
                     flatShading: false
                   });
+                  loadedMaterials.push(material);
+                  child.material = material;
                 },
                 undefined,
                 () => {
+                  if (!isMounted) return;
+                  
                   // If texture fails, use default material
-                  child.material = new THREE.MeshStandardMaterial({ 
+                  const material = new THREE.MeshStandardMaterial({ 
                     color: 0x8b5cf6,
                     roughness: 0.6,
                     metalness: 0.0,
@@ -119,6 +182,8 @@ function AnimeCharacter({ modelUrl }: { modelUrl?: string | null }) {
                     emissiveIntensity: 0.1,
                     side: THREE.DoubleSide
                   });
+                  loadedMaterials.push(material);
+                  child.material = material;
                 }
               );
             }
@@ -128,17 +193,51 @@ function AnimeCharacter({ modelUrl }: { modelUrl?: string | null }) {
         // Scale the model to fit
         object.scale.setScalar(3.5);
         object.position.set(0, 0.1, 0);
-        setModel(object);
-        setLoading(false);
+        
+        if (isMounted) {
+          setModel(object);
+          setLoading(false);
+        }
       },
       undefined,
       (error) => {
         console.error('Error loading model:', error);
-        setError('Failed to load 3D model');
-        setLoading(false);
+        if (isMounted) {
+          setError('Failed to load 3D model');
+          setLoading(false);
+        }
       }
     );
-  }, [modelUrl, defaultTexture]);
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      
+      // Dispose all loaded textures
+      loadedTextures.forEach(texture => {
+        texture.dispose();
+      });
+      
+      // Dispose all loaded materials
+      loadedMaterials.forEach(material => {
+        material.dispose();
+      });
+      
+      // Dispose model if it exists
+      if (model) {
+        model.traverse((child: THREE.Object3D) => {
+          if (child instanceof THREE.Mesh) {
+            child.geometry.dispose();
+            if (Array.isArray(child.material)) {
+              child.material.forEach(mat => mat.dispose());
+            } else {
+              child.material.dispose();
+            }
+          }
+        });
+      }
+    };
+  }, [modelUrl]);
 
   if (loading) {
     return (
@@ -178,14 +277,16 @@ function AnimeCharacter({ modelUrl }: { modelUrl?: string | null }) {
       <primitive object={model} ref={meshRef} />
     </RotatingModel>
   );
-}
+});
+
+AnimeCharacter.displayName = 'AnimeCharacter';
 
 // Main 3D viewer component
 interface ModelViewer3DProps {
   modelUrl?: string | null;
 }
 
-const ModelViewer3D: React.FC<ModelViewer3DProps> = ({ modelUrl }) => {
+const ModelViewer3D: React.FC<ModelViewer3DProps> = memo(({ modelUrl }) => {
   return (
     <div className="w-full h-full">
       <Canvas
@@ -194,23 +295,24 @@ const ModelViewer3D: React.FC<ModelViewer3DProps> = ({ modelUrl }) => {
         gl={{ 
           antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 0.84 // Increased by 20% for brighter appearance
+          toneMappingExposure: 0.84,
+          powerPreference: 'high-performance'
         }}
+        dpr={[1, 2]}
+        frameloop="always"
+        performance={{ min: 0.5 }}
       >
-        <ambientLight intensity={0.48} />
-        <directionalLight position={[5, 5, 5]} intensity={0.84} color="#ffffff" />
-        <directionalLight position={[-3, 2, 3]} intensity={1.8} color="#ffddaa" />
-        <pointLight position={[0, 3, 2]} intensity={1.8} color="#ff6b6b" />
-        <pointLight position={[2, 1, 1]} intensity={1.44} color="#4ecdc4" />
-        <pointLight position={[-2, 1, 1]} intensity={1.32} color="#ff9f43" />
-        <pointLight position={[0, -2, 1]} intensity={1.2} color="#ff6348" />
-        {/* Additional red lighting for face/hands */}
-        <pointLight position={[1, 2, 1]} intensity={0.96} color="#8B0000" />
-        <pointLight position={[-1, 2, 1]} intensity={0.96} color="#8B0000" />
+        {/* Optimized lighting - reduced from 8 to 4 lights */}
+        <ambientLight intensity={0.6} />
+        <directionalLight position={[5, 5, 5]} intensity={1.2} color="#ffffff" />
+        <directionalLight position={[-3, 2, 3]} intensity={1.0} color="#ffddaa" />
+        <pointLight position={[2, 2, 2]} intensity={1.5} color="#ff6b6b" />
         <AnimeCharacter modelUrl={modelUrl} />
       </Canvas>
     </div>
   );
-};
+});
+
+ModelViewer3D.displayName = 'ModelViewer3D';
 
 export default ModelViewer3D;
