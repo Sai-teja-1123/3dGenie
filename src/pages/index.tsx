@@ -1,22 +1,10 @@
 import Navbar from "@/components/navbar";
 import Hero from "@/components/hero";
+import HowItWorks from "@/components/howitworks";
+import WhyChooseUs from "@/components/whychoose";
+import Gallery from "@/components/gallery";
 import Footer from "@/components/footer";
-import { useEffect, lazy, Suspense } from "react";
-
-// Lazy load heavy components
-const HowItWorks = lazy(() => import("@/components/howitworks"));
-const WhyChooseUs = lazy(() => import("@/components/whychoose"));
-const Gallery = lazy(() => import("@/components/gallery"));
-
-// Loading fallback component
-const SectionLoadingFallback = () => (
-  <div className="w-full py-20 flex items-center justify-center">
-    <div className="flex flex-col items-center gap-4">
-      <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-      <p className="text-muted-foreground">Loading...</p>
-    </div>
-  </div>
-);
+import { useEffect } from "react";
 
 const Index = () => {
   useEffect(() => {
@@ -32,15 +20,9 @@ const Index = () => {
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       <Hero />
-      <Suspense fallback={<SectionLoadingFallback />}>
-        <HowItWorks />
-      </Suspense>
-      <Suspense fallback={<SectionLoadingFallback />}>
-        <WhyChooseUs />
-      </Suspense>
-      <Suspense fallback={<SectionLoadingFallback />}>
-        <Gallery />
-      </Suspense>
+      <HowItWorks />
+      <WhyChooseUs />
+      <Gallery />
       <Footer />
     </div>
   );

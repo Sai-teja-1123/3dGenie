@@ -96,6 +96,8 @@ const MagicMaker = () => {
   }, []);
 
   const readyForCustomization = Boolean(previewUrl && model);
+  const readyForPreview = Boolean(previewUrl && model && customNotes.trim());
+  const [showPreview, setShowPreview] = useState(false);
   const estimatedSecondsLeft = generating ? Math.max(0, Math.ceil((100 - progress) * 0.35)) : 0;
   const selectedAccessoryLabel = selectedAccessory ? accessoryOptions.find((opt) => opt.id === selectedAccessory)?.label ?? "None" : "None";
   const statusMessage = generationMessage || (readyForCustomization ? "Enter or review your prompt, then create your 3D model." : "Upload a photo and choose a cartoon style to get started.");
@@ -272,6 +274,12 @@ const MagicMaker = () => {
       setGenerationMessage("Customize the colors and accessories, then create your 3D model.");
     }
   }, [readyForCustomization, generationStatus]);
+
+  useEffect(() => {
+    if (!readyForCustomization) {
+      setShowPreview(false);
+    }
+  }, [readyForCustomization]);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -529,6 +537,7 @@ const MagicMaker = () => {
                         setAge("");
                         setModel(null);
                         setCustomNotes("");
+                    setShowPreview(false);
                       }}
                       aria-label="Remove uploaded image"
                       title="Remove photo"
@@ -675,7 +684,10 @@ const MagicMaker = () => {
                 {model && (
                   <button
                     className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20"
-                    onClick={() => setModel(null)}
+                    onClick={() => {
+                      setModel(null);
+                      setShowPreview(false);
+                    }}
                     aria-label="Remove selected model"
                   >
                     <Trash className="h-4 w-4" />
@@ -712,6 +724,7 @@ const MagicMaker = () => {
                       className="relative rounded-xl overflow-hidden border border-white/10 hover:border-white/30 focus:outline-none"
                       onClick={() => {
                         setModel(item);
+                      setShowPreview(false);
                         setPickerOpen(false);
                         // Auto-populate prompt when model is selected
                         if (promptsLoaded) {
@@ -918,82 +931,146 @@ const MagicMaker = () => {
             </div>
 
             {readyForCustomization ? (
-              <div className="space-y-8">
-                <section>
-                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                    <h4 className="text-sm font-semibold text-white mb-2">Prompt</h4>
-                    <textarea
-                      value={customNotes}
-                      onChange={(e) => setCustomNotes(e.target.value)}
-                      placeholder="Prompt will be auto-populated when you select a model."
-                      className="w-full min-h-[200px] rounded-xl border border-white/15 bg-[#0f172a]/60 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-300/40"
-                    />
-                  </div>
-                </section>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <section>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <h4 className="text-sm font-semibold text-white mb-2">Prompt</h4>
+                      <textarea
+                        value={customNotes}
+                        onChange={(e) => {
+                          setCustomNotes(e.target.value);
+                          setShowPreview(false);
+                        }}
+                        placeholder="Prompt will be auto-populated when you select a model."
+                        className="w-full min-h-[200px] rounded-xl border border-white/15 bg-[#0f172a]/60 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-300/40"
+                      />
+                    </div>
+                  </section>
 
-                <section className="rounded-2xl bg-white/8 border border-white/12 p-4 sm:p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-yellow-300 via-orange-400 to-pink-500 flex items-center justify-center text-[#0f172a]">
-                      <Sparkles className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <div className="font-semibold text-white">Magic Maker Engine</div>
-                      <p className="text-xs text-white/70">We blend your custom colors, props, and photo details into a magical 3D render.</p>
-                    </div>
-                  </div>
-                  <div className="w-full md:w-1/2 space-y-3">
-                    <button
-                      type="button"
-                      onClick={startGeneration}
-                      disabled={!readyForCustomization || generating}
-                      className={`w-full inline-flex items-center justify-center rounded-2xl px-5 py-3 font-semibold transition-all ${readyForCustomization ? "bg-yellow-400 text-[#0f172a] hover:bg-yellow-300" : "bg-white/10 text-white/40 cursor-not-allowed"} ${generating ? "animate-pulse" : ""}`}
-                    >
-                      {generating ? "Creating model..." : "Create 3D Model"}
-                    </button>
-                    {!readyForCustomization && (
-                      <p className="text-xs text-white/50 text-center mt-1">
-                        Note: Models must be installed in ComfyUI for generation to work
-                      </p>
-                    )}
-                    <div className={`rounded-xl border p-3 text-xs space-y-2 ${
-                      generationStatus === "error" 
-                        ? "bg-red-500/10 border-red-500/30 text-red-200" 
-                        : "bg-black/40 border-white/10 text-white/70"
-                    }`}>
-                      <div className={`font-semibold ${generationStatus === "error" ? "text-red-300" : "text-white"}`}>
-                        Status
+                  <section className="rounded-2xl bg-white/8 border border-white/12 p-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-sky-300 via-purple-400 to-pink-400 flex items-center justify-center text-[#0f172a]">
+                        <Sparkles className="h-5 w-5" />
                       </div>
-                      <p className={generationStatus === "error" ? "text-red-200" : ""}>{statusMessage}</p>
-                      {generationStatus === "error" && (
-                        <div className="mt-2 p-2 bg-red-500/20 border border-red-500/30 rounded-lg text-[11px]">
-                          <div className="font-semibold mb-1">Missing Models?</div>
-                          <div className="text-red-200/80">
-                            Generation requires models to be installed in ComfyUI. Check{" "}
-                            <code className="bg-black/30 px-1 rounded">backend/MODELS_SETUP.md</code>{" "}
-                            for setup instructions.
-                          </div>
-                        </div>
-                      )}
-                      {(generating || progress > 0) && (
-                        <>
-                          <div className="flex items-center justify-between text-[11px] text-white/50">
-                            <span>Progress</span>
-                            <span>{progress}%</span>
-                          </div>
-                          <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-400 transition-all duration-300"
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
-                          <div className="text-[11px] text-white/50">
-                            {generating && estimatedSecondsLeft ? `Estimated time left: ~${estimatedSecondsLeft}s` : generationStatus === "done" ? "Model ready! Scroll down to preview below." : null}
-                          </div>
-                        </>
+                      <div>
+                        <div className="font-semibold text-white">Magic Maker Engine</div>
+                        <p className="text-xs text-white/70">We blend your custom colors, props, and photo details into a magical 3D render.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowPreview(true)}
+                        disabled={!readyForPreview}
+                        className={`w-full inline-flex items-center justify-center rounded-2xl px-5 py-3 font-semibold transition-all ${
+                          readyForPreview ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-white/10 text-white/40 cursor-not-allowed"
+                        }`}
+                      >
+                        Preview
+                      </button>
+                      <button
+                        type="button"
+                        onClick={startGeneration}
+                        disabled={!readyForCustomization || generating}
+                        className={`w-full inline-flex items-center justify-center rounded-2xl px-5 py-3 font-semibold transition-all ${
+                          readyForCustomization ? "bg-yellow-400 text-[#0f172a] hover:bg-yellow-300" : "bg-white/10 text-white/40 cursor-not-allowed"
+                        } ${generating ? "animate-pulse" : ""}`}
+                      >
+                        {generating ? "Creating model..." : "Create 3D Model"}
+                      </button>
+                      {!readyForCustomization && (
+                        <p className="text-xs text-white/50 text-center">
+                          Note: Models must be installed in ComfyUI for generation to work
+                        </p>
                       )}
                     </div>
+                  </section>
+                </div>
+
+                <div className="space-y-6">
+                  {showPreview ? (
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <h4 className="text-sm font-semibold text-white mb-4">Live Preview</h4>
+                      <div className="aspect-square rounded-xl overflow-hidden bg-gradient-to-br from-purple-200 via-pink-200 to-orange-200 flex items-center justify-center">
+                        {model ? (
+                          <div className="relative w-full h-full">
+                            <img src={model.src} alt={`Preview of ${model.name}`} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                              <div className="text-center text-white space-y-1 px-4">
+                                <div className="text-lg font-bold">3D Preview</div>
+                                <div className="text-sm opacity-90">{model.name}</div>
+                                <div className="text-xs opacity-75 mt-1 max-w-xs mx-auto">
+                                  Prompt: {customNotes.slice(0, 90)}
+                                  {customNotes.length > 90 ? "... " : ""}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-sm px-3 py-2 text-center">
+                              Preview Mode
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-black/60 text-sm">Preview will appear here</div>
+                        )}
+                      </div>
+                      <div className="mt-4">
+                        <button
+                          onClick={() => setShowPreview(false)}
+                          className="w-full inline-flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/20 py-2 px-4 text-sm font-medium transition-colors"
+                        >
+                          Try Again
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 flex items-center justify-center py-12 text-center text-white/60">
+                      <div className="max-w-md mx-auto space-y-2">
+                        <p className="font-semibold text-white">Enter a prompt and click Preview</p>
+                        <p className="text-sm">See how your 3D character will look before generating</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div
+                    className={`rounded-xl border p-3 text-xs space-y-2 ${
+                      generationStatus === "error" ? "bg-red-500/10 border-red-500/30 text-red-200" : "bg-black/40 border-white/10 text-white/70"
+                    }`}
+                  >
+                    <div className={`font-semibold ${generationStatus === "error" ? "text-red-300" : "text-white"}`}>Status</div>
+                    <p className={generationStatus === "error" ? "text-red-200" : ""}>{statusMessage}</p>
+                    {generationStatus === "error" && (
+                      <div className="mt-2 p-2 bg-red-500/20 border border-red-500/30 rounded-lg text-[11px]">
+                        <div className="font-semibold mb-1">Missing Models?</div>
+                        <div className="text-red-200/80">
+                          Generation requires models to be installed in ComfyUI. Check{" "}
+                          <code className="bg-black/30 px-1 rounded">backend/MODELS_SETUP.md</code> for setup instructions.
+                        </div>
+                      </div>
+                    )}
+                    {(generating || progress > 0) && (
+                      <>
+                        <div className="flex items-center justify-between text-[11px] text-white/50">
+                          <span>Progress</span>
+                          <span>{progress}%</span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-400 transition-all duration-300"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <div className="text-[11px] text-white/50">
+                          {generating && estimatedSecondsLeft
+                            ? `Estimated time left: ~${estimatedSecondsLeft}s`
+                            : generationStatus === "done"
+                              ? "Model ready! Scroll down to preview below."
+                              : null}
+                        </div>
+                      </>
+                    )}
                   </div>
-                </section>
+                </div>
               </div>
             ) : (
               <div className="h-full flex items-center justify-center rounded-xl border border-dashed border-white/15 bg-white/5 py-12 text-center text-white/60">
