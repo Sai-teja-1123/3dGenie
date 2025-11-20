@@ -6,6 +6,7 @@ import { FaMale, FaFemale } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import {
   generate3DModel,
+  generateImage,
   pollJobStatus,
   getResultFileUrl,
   ApiError,
@@ -62,14 +63,12 @@ const MagicMaker = () => {
   type ModelItem = { src: string; name: string };
   const [model, setModel] = useState<ModelItem | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [showCharModal, setShowCharModal] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
   const [cropScale, setCropScale] = useState(1.0);
   const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState<{x:number;y:number}|null>(null);
   const cropContainerRef = useRef<HTMLDivElement | null>(null);
   const [cropRect, setCropRect] = useState<{ x: number; y: number; size: number }>({ x: 150, y: 150, size: 300 });
+  const [minZoom, setMinZoom] = useState(0.1);
   const [cropDragMode, setCropDragMode] = useState<null | "move" | "nw" | "ne" | "sw" | "se">(null);
   const [dragStartPt, setDragStartPt] = useState<{ x: number; y: number } | null>(null);
   const [gender, setGender] = useState("");
@@ -91,6 +90,10 @@ const MagicMaker = () => {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [resultFiles, setResultFiles] = useState<string[]>([]);
   const [resultModelUrl, setResultModelUrl] = useState<string | null>(null);
+  const [previewGenerating, setPreviewGenerating] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewJobId, setPreviewJobId] = useState<string | null>(null);
+  const [previewProgress, setPreviewProgress] = useState(0);
   const user = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("auth_user") || "null"); } catch { return null; }
   }, []);
@@ -248,6 +251,92 @@ const MagicMaker = () => {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
+      }
+    }
+  };
+
+  const startPreviewGeneration = async () => {
+    if (!readyForPreview) {
+      setGenerationMessage("Upload a photo, select a model, and enter a prompt to preview.");
+      return;
+    }
+    if (previewGenerating) {
+      return;
+    }
+
+    if (!previewUrl) {
+      setGenerationMessage("Please upload an image first.");
+      return;
+    }
+
+    setPreviewGenerating(true);
+    setPreviewProgress(0);
+    setPreviewImageUrl(null);
+    setPreviewJobId(null);
+    setShowPreview(true);
+    setGenerationStatus("running");
+    setGenerationMessage("Generating preview image...");
+
+    try {
+      // Convert preview URL to File
+      const response = await fetch(previewUrl);
+      const blob = await response.blob();
+      const file = new File([blob], "uploaded-image.jpg", { type: blob.type });
+
+      // Start image generation
+      const jobResponse = await generateImage(
+        file,
+        customNotes,
+        "watermark, text, low quality, blurry",
+        20,
+        3.5
+      );
+
+      setPreviewJobId(jobResponse.job_id);
+      setGenerationMessage(`Preview job created! Generating...`);
+
+      // Poll for status
+      const result = await pollJobStatus(
+        jobResponse.job_id,
+        (progressValue, status) => {
+          setPreviewProgress(progressValue);
+          if (status === "processing" || status === "queued") {
+            setGenerationMessage(`Generating preview... ${Math.round(progressValue)}%`);
+          }
+        },
+        2000,
+        300000 // 5 minute timeout for preview
+      );
+
+      // Preview completed
+      setPreviewProgress(100);
+      setPreviewGenerating(false);
+      setGenerationStatus("done");
+
+      if (result.result_files && result.result_files.length > 0) {
+        // Find image file
+        const imageFile = result.result_files.find(
+          (f) => f.endsWith(".png") || f.endsWith(".jpg") || f.endsWith(".jpeg")
+        );
+        if (imageFile) {
+          const imageUrl = getResultFileUrl(jobResponse.job_id, imageFile);
+          setPreviewImageUrl(imageUrl);
+          setGenerationMessage("Preview generated! Review and create 3D model if satisfied.");
+        } else {
+          setGenerationMessage("Preview completed, but no image file found.");
+        }
+      } else {
+        setGenerationMessage("Preview completed, but no output files found.");
+      }
+    } catch (error) {
+      console.error("Preview generation error:", error);
+      setPreviewGenerating(false);
+      setGenerationStatus("error");
+      
+      if (error instanceof ApiError) {
+        setGenerationMessage(`Preview error: ${error.message}`);
+      } else {
+        setGenerationMessage(`An error occurred: ${error instanceof Error ? error.message : "Unknown error"}`);
       }
     }
   };
@@ -458,23 +547,77 @@ const MagicMaker = () => {
   const renderCrop = () => {
     const canvas = cropCanvasRef.current;
     const img = cropImgRef.current;
-    if (!canvas || !img) return;
+    const container = cropContainerRef.current;
+    if (!canvas || !img || !container) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const size = Math.min(canvas.width, canvas.height);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Get actual container size (use full dimensions, not just minimum)
+    const rect = container.getBoundingClientRect();
+    const containerWidth = rect.width;
+    const containerHeight = rect.height;
+    
+    if (containerWidth <= 0 || containerHeight <= 0) return; // Wait for valid size
+    
+    // Set canvas size to match container (use device pixel ratio for quality)
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = containerWidth * dpr;
+    canvas.height = containerHeight * dpr;
+    canvas.style.width = `${containerWidth}px`;
+    canvas.style.height = `${containerHeight}px`;
+    
+    // Reset transform and scale for high DPI
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    
+    // Clear and fill background
+    ctx.clearRect(0, 0, containerWidth, containerHeight);
     ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, containerWidth, containerHeight);
+    
+    // Calculate image dimensions
     const iw = img.naturalWidth * cropScale;
     const ih = img.naturalHeight * cropScale;
-    const cx = canvas.width / 2 + cropOffset.x;
-    const cy = canvas.height / 2 + cropOffset.y;
+    
+    // Center the image with offset
+    const cx = containerWidth / 2 + cropOffset.x;
+    const cy = containerHeight / 2 + cropOffset.y;
     const dx = cx - iw / 2;
     const dy = cy - ih / 2;
+    
+    // Draw the image
     ctx.drawImage(img, dx, dy, iw, ih);
   };
 
-  useEffect(() => { renderCrop(); }, [cropScale, cropOffset, cropOpen]);
+  useEffect(() => { 
+    if (cropOpen) {
+      // Resize canvas when container size changes
+      const resizeObserver = new ResizeObserver(() => {
+        const container = cropContainerRef.current;
+        const img = cropImgRef.current;
+        if (container && img) {
+          const rect = container.getBoundingClientRect();
+          const containerWidth = rect.width;
+          const containerHeight = rect.height;
+          if (containerWidth > 0 && containerHeight > 0) {
+            // Recalculate min zoom when container resizes
+            const scaleToFitWidth = containerWidth / img.naturalWidth;
+            const scaleToFitHeight = containerHeight / img.naturalHeight;
+            const scaleToFit = Math.min(scaleToFitWidth, scaleToFitHeight);
+            const calculatedMinZoom = scaleToFit * 0.5;
+            setMinZoom(Math.max(0.05, calculatedMinZoom));
+          }
+        }
+        renderCrop();
+      });
+      const container = cropContainerRef.current;
+      if (container) {
+        resizeObserver.observe(container);
+        renderCrop(); // Initial render
+        return () => resizeObserver.disconnect();
+      }
+    }
+  }, [cropScale, cropOffset, cropOpen]);
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white flex flex-col">
@@ -515,10 +658,16 @@ const MagicMaker = () => {
           </h1>
 
           {/* Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 items-stretch">
             {/* Left: Upload card */}
-            <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4 sm:p-6">
-              <div className="relative aspect-square rounded-lg overflow-hidden bg-gradient-to-br from-yellow-200 via-orange-200 to-sky-200 flex items-center justify-center">
+            <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4 sm:p-6 flex flex-col">
+              <div className="mb-4">
+                <div className="font-medium">Upload & Crop Photo</div>
+                <div className="text-sm text-white/70">Select a photo and crop to select the face</div>
+              </div>
+              
+              {/* Photo Preview Area */}
+              <div className="relative flex-1 min-h-[200px] rounded-lg overflow-hidden bg-gradient-to-br from-yellow-200 via-orange-200 to-sky-200 flex items-center justify-center mb-4">
                 {previewUrl ? (
                   <img src={previewUrl} alt="Upload preview" className="w-full h-full object-cover" />
                 ) : (
@@ -537,7 +686,7 @@ const MagicMaker = () => {
                         setAge("");
                         setModel(null);
                         setCustomNotes("");
-                    setShowPreview(false);
+                        setShowPreview(false);
                       }}
                       aria-label="Remove uploaded image"
                       title="Remove photo"
@@ -566,96 +715,62 @@ const MagicMaker = () => {
                       const url = URL.createObjectURL(file);
                       if (rawImageUrl) URL.revokeObjectURL(rawImageUrl);
                       setRawImageUrl(url);
-                      setShowCharModal(true);
+                      // Directly open crop modal
+                      setCropOpen(true);
+                      setTimeout(() => {
+                        // initialize crop canvas and image
+                        const img = new Image();
+                        img.onload = () => {
+                          cropImgRef.current = img;
+                          const container = cropContainerRef.current;
+                          if (container) {
+                            // Wait a bit for container to be fully rendered
+                            const initCrop = () => {
+                              const rect = container.getBoundingClientRect();
+                              const containerWidth = rect.width;
+                              const containerHeight = rect.height;
+                              
+                              if (containerWidth <= 0 || containerHeight <= 0) {
+                                // Retry if container not ready
+                                setTimeout(initCrop, 50);
+                                return;
+                              }
+                              
+                              // Calculate scale to fit entire image within container
+                              const scaleToFitWidth = containerWidth / img.naturalWidth;
+                              const scaleToFitHeight = containerHeight / img.naturalHeight;
+                              const scaleToFit = Math.min(scaleToFitWidth, scaleToFitHeight);
+                              
+                              // Set minimum zoom to allow full image to be visible (with some margin)
+                              const calculatedMinZoom = scaleToFit * 0.3; // Allow zooming out to 30% of fit
+                              const finalMinZoom = Math.max(0.05, calculatedMinZoom); // Ensure minimum is at least 0.05
+                              setMinZoom(finalMinZoom);
+                              
+                              // Set initial scale to fill the container (95% to leave small margin)
+                              // This makes the image fill most of the available space
+                              const initialScale = scaleToFit * 0.95;
+                              setCropScale(initialScale);
+                              setCropOffset({ x: 0, y: 0 });
+                              
+                              // Initialize crop rect to center, about 60% of the smaller dimension (keep it square)
+                              const containerSize = Math.min(containerWidth, containerHeight);
+                              const cropSize = containerSize * 0.6;
+                              const cropX = (containerWidth - cropSize) / 2;
+                              const cropY = (containerHeight - cropSize) / 2;
+                              setCropRect({ x: cropX, y: cropY, size: cropSize });
+                              
+                              // Render the crop
+                              renderCrop();
+                            };
+                            
+                            initCrop();
+                          }
+                        };
+                        img.src = url;
+                      }, 100);
                     }
                   }}
                 />
-                {showCharModal && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white/50 bg-gradient-to-br from-yellow-200 via-orange-200 to-sky-200 rounded-lg z-20">
-                    <div className="bg-white/80 backdrop-blur px-6 py-8 rounded-xl shadow-xl w-full max-w-xs mx-auto">
-                      <h2 className="font-bold text-lg mb-4 text-center text-[#222]">Enter Character Details</h2>
-                      <div className="mb-2">
-                        <label className="block mb-1 font-medium text-black">Gender:</label>
-                        <div className="flex gap-6 items-center mb-2 justify-center">
-                          <button
-                            className={`flex flex-col items-center px-3 py-2 rounded-xl border transition hover:bg-yellow-100 ${gender === 'male' ? 'bg-yellow-300 border-yellow-600 text-black scale-105' : 'bg-white/60 border-gray-300 text-gray-500'}`}
-                            onClick={() => setGender('male')}
-                            type="button"
-                            tabIndex={0}
-                          >
-                            <FaMale className="text-3xl mb-1" />
-                            <span className="text-xs font-medium">Boy</span>
-                          </button>
-                          <button
-                            className={`flex flex-col items-center px-3 py-2 rounded-xl border transition hover:bg-pink-100 ${gender === 'female' ? 'bg-pink-200 border-pink-600 text-black scale-105' : 'bg-white/60 border-gray-300 text-gray-500'}`}
-                            onClick={() => setGender('female')}
-                            type="button"
-                            tabIndex={0}
-                          >
-                            <FaFemale className="text-3xl mb-1" />
-                            <span className="text-xs font-medium">Girl</span>
-                          </button>
-                        </div>
-                      </div>
-                      <div className="mb-6">
-                        <label className="block mb-1 font-medium text-black">Age (years):</label>
-                        <input
-                          type="number"
-                          value={age}
-                          onChange={e => {
-                            let val = parseInt(e.target.value.replace(/[^\d]/g, ""), 10);
-                            if (isNaN(val)) val = "";
-                            if (val !== "" && val < MIN_AGE) val = MIN_AGE;
-                            if (val > MAX_AGE) val = MAX_AGE;
-                            setAge(val === "" ? "" : String(val));
-                          }}
-                          min={MIN_AGE}
-                          max={MAX_AGE}
-                          className="border border-gray-300 p-2 rounded w-full text-black text-lg bg-white bg-opacity-70 focus:ring-2 focus:ring-yellow-400"
-                          placeholder={`Enter age (${MIN_AGE}-${MAX_AGE})`}
-                          maxLength={2}
-                          inputMode="numeric"
-                        />
-                        <div className="text-xs text-gray-600 mt-1">Only ages 1 to 16 allowed</div>
-                      </div>
-                      <div className="flex justify-between gap-2">
-                        <button className="bg-white border text-gray-700 px-4 py-2 rounded hover:bg-gray-200 flex-1" type="button" onClick={() => setShowCharModal(false)}>
-                          Cancel
-                        </button>
-                        <button
-                          className="bg-yellow-400 hover:bg-yellow-300 text-[#0f172a] font-semibold px-4 py-2 rounded flex-1 disabled:bg-gray-200 disabled:text-gray-400"
-                          type="button"
-                          disabled={!(gender && age && Number(age) >= MIN_AGE && Number(age) <= MAX_AGE)}
-                          onClick={() => {
-                            setShowCharModal(false);
-                            if (rawImageUrl) {
-                              setCropOpen(true);
-                              setTimeout(() => {
-                                // initialize crop canvas and image
-                                const img = new Image();
-                                img.onload = () => {
-                                  cropImgRef.current = img;
-                                  const canvas = cropCanvasRef.current;
-                                  if (canvas) {
-                                    const rect = canvas.getBoundingClientRect();
-                                    canvas.width = 600; // logical size for quality
-                                    canvas.height = 600;
-                                    setCropScale(Math.min(600 / img.naturalWidth, 600 / img.naturalHeight) * 1.2);
-                                    setCropOffset({ x: 0, y: 0 });
-                                    renderCrop();
-                                  }
-                                };
-                                img.src = rawImageUrl;
-                              }, 0);
-                            }
-                          }}
-                        >
-                          Confirm
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
                 <button
                   className="absolute bottom-3 right-3 inline-flex items-center gap-2 rounded-full bg-white text-[#0f172a] hover:bg-white/90 px-4 py-2 text-sm"
                   onClick={() => fileInputRef.current?.click()}
@@ -664,47 +779,123 @@ const MagicMaker = () => {
                   Upload
                 </button>
               </div>
-              <div className="mt-4">
-                <div className="font-medium">Upload any picture</div>
-                <div className="text-sm text-white/70">Select from your device</div>
+
+              {/* Prompt Section */}
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">Prompt</label>
+                <textarea
+                  value={customNotes}
+                  onChange={(e) => {
+                    setCustomNotes(e.target.value);
+                    setShowPreview(false);
+                  }}
+                  placeholder="Enter your prompt or it will be auto-populated when you select a model..."
+                  className="w-full min-h-[100px] rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 resize-none"
+                />
+                <div className="text-xs text-white/50 mt-1">Prompt will be auto-populated when you select a model</div>
               </div>
             </div>
 
-            {/* Right: Cartoon style card */}
-            <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4 sm:p-6">
-              <div className="relative aspect-square rounded-lg overflow-hidden bg-[#111827] flex items-center justify-center">
-                {model ? (
-                  <>
-                    <img src={model.src} alt={model.name} className="w-full h-full object-cover" />
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-sm px-3 py-2 text-center">{model.name}</div>
-                  </>
-                ) : (
-                  <div className="text-white/70 text-sm">Cartoon model preview</div>
-                )}
-                {model && (
-                  <button
-                    className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20"
-                    onClick={() => {
-                      setModel(null);
-                      setShowPreview(false);
+            {/* Right: Character selection card */}
+            <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4 sm:p-6 flex flex-col">
+              <div className="space-y-4 flex-1">
+                {/* Gender Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-white/90 mb-2">Select Gender</label>
+                  <div className="flex gap-4">
+                    <button
+                      className={`flex-1 flex flex-col items-center justify-center px-4 py-4 rounded-xl border-2 transition-all ${
+                        gender === 'male' 
+                          ? 'bg-yellow-400/20 border-yellow-400 text-yellow-300 scale-105' 
+                          : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10'
+                      }`}
+                      onClick={() => {
+                        setGender('male');
+                        setModel(null); // Reset model when gender changes
+                        setShowPreview(false);
+                      }}
+                      type="button"
+                    >
+                      <FaMale className="text-3xl mb-2" />
+                      <span className="text-sm font-medium">Boy</span>
+                    </button>
+                    <button
+                      className={`flex-1 flex flex-col items-center justify-center px-4 py-4 rounded-xl border-2 transition-all ${
+                        gender === 'female' 
+                          ? 'bg-pink-400/20 border-pink-400 text-pink-300 scale-105' 
+                          : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10'
+                      }`}
+                      onClick={() => {
+                        setGender('female');
+                        setModel(null); // Reset model when gender changes
+                        setShowPreview(false);
+                      }}
+                      type="button"
+                    >
+                      <FaFemale className="text-3xl mb-2" />
+                      <span className="text-sm font-medium">Girl</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Age Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-white/90 mb-2">Age (years)</label>
+                  <input
+                    type="number"
+                    value={age}
+                    onChange={e => {
+                      let val = parseInt(e.target.value.replace(/[^\d]/g, ""), 10);
+                      if (isNaN(val)) val = "";
+                      if (val !== "" && val < MIN_AGE) val = MIN_AGE;
+                      if (val > MAX_AGE) val = MAX_AGE;
+                      setAge(val === "" ? "" : String(val));
                     }}
-                    aria-label="Remove selected model"
-                  >
-                    <Trash className="h-4 w-4" />
-                  </button>
-                )}
-                {/* Basket (model picker) */}
-                <button
-                  className="absolute bottom-3 right-3 inline-flex items-center gap-2 rounded-full bg-white text-[#0f172a] hover:bg-white/90 px-4 py-2 text-sm"
-                  onClick={() => setPickerOpen(true)}
-                >
-                  <ShoppingBag className="h-4 w-4" />
-                  Choose Model
-                </button>
-              </div>
-              <div className="mt-4">
-                <div className="font-medium">Choose a fun cartoon style</div>
-                <div className="text-sm text-white/70">Pick a style that suits your child's personality</div>
+                    min={MIN_AGE}
+                    max={MAX_AGE}
+                    className="w-full border border-white/20 bg-white/5 text-white rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
+                    placeholder={`Enter age (${MIN_AGE}-${MAX_AGE})`}
+                    maxLength={2}
+                    inputMode="numeric"
+                  />
+                  <div className="text-xs text-white/50 mt-1">Ages {MIN_AGE} to {MAX_AGE} only</div>
+                </div>
+
+                {/* Model Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-white/90 mb-2">Choose Model</label>
+                  <div className="relative aspect-square rounded-lg overflow-hidden bg-[#111827] flex items-center justify-center border border-white/10">
+                    {model ? (
+                      <>
+                        <img src={model.src} alt={model.name} className="w-full h-full object-cover" />
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-sm px-3 py-2 text-center font-medium">{model.name}</div>
+                        <button
+                          className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20"
+                          onClick={() => {
+                            setModel(null);
+                            setShowPreview(false);
+                          }}
+                          aria-label="Remove selected model"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-white/50 text-sm text-center px-4">No model selected</div>
+                    )}
+                    <button
+                      className="absolute bottom-3 right-3 inline-flex items-center gap-2 rounded-full bg-white text-[#0f172a] hover:bg-white/90 px-4 py-2 text-sm font-medium"
+                      onClick={() => setPickerOpen(true)}
+                      disabled={!gender}
+                    >
+                      <ShoppingBag className="h-4 w-4" />
+                      {model ? 'Change Model' : 'Choose Model'}
+                    </button>
+                  </div>
+                  {!gender && (
+                    <div className="text-xs text-white/50 mt-2">Please select gender first</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -714,11 +905,16 @@ const MagicMaker = () => {
             <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="w-full max-w-4xl bg-[#0b1222] text-white rounded-2xl border border-white/10 p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Pick a 3D model</h3>
+                  <h3 className="text-lg font-semibold">Pick a 3D model {gender && `(${gender === 'male' ? 'Boy' : 'Girl'})`}</h3>
                   <button className="text-white/70 hover:text-white" onClick={() => setPickerOpen(false)}>Close</button>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 max-h-[60vh] overflow-auto">
-                  {modelOptions.map((item) => (
+                {!gender ? (
+                  <div className="text-center py-8 text-white/60">
+                    Please select gender first
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 max-h-[60vh] overflow-auto">
+                    {modelOptions.map((item) => (
                     <button
                       key={item.src}
                       className="relative rounded-xl overflow-hidden border border-white/10 hover:border-white/30 focus:outline-none"
@@ -777,8 +973,9 @@ const MagicMaker = () => {
                       <img src={item.src} alt={item.name} className="w-full h-40 object-cover" />
                       <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-2 py-1 text-center">{item.name}</div>
                     </button>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -786,14 +983,18 @@ const MagicMaker = () => {
           {/* Crop Modal */}
           {cropOpen && (
             <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="w-full max-w-xl bg-[#0b1222] text-white rounded-2xl border border-white/10 p-4 sm:p-6 select-none">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Crop your photo</h3>
+              <div className="w-full max-w-4xl max-h-[90vh] bg-[#0b1222] text-white rounded-2xl border border-white/10 p-4 sm:p-6 select-none flex flex-col">
+                <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                  <div>
+                    <h3 className="text-lg font-semibold">Crop to Select Face</h3>
+                    <p className="text-sm text-white/60 mt-1">Adjust the crop area to focus on the face</p>
+                  </div>
                   <button className="text-white/70 hover:text-white" onClick={() => setCropOpen(false)}>Close</button>
                 </div>
                 <div
                   ref={cropContainerRef}
-                  className="relative w-full aspect-square rounded-xl overflow-hidden bg-black/70 border border-white/10 select-none"
+                  className="relative w-full flex-1 min-h-0 rounded-xl overflow-hidden bg-black/70 border border-white/10 select-none"
+                  style={{ minHeight: '400px', maxHeight: 'calc(90vh - 200px)', aspectRatio: '4 / 3' }}
                   onMouseDown={(e) => {
                     const rect = cropContainerRef.current?.getBoundingClientRect();
                     if (!rect) return;
@@ -823,25 +1024,28 @@ const MagicMaker = () => {
                     setDragStartPt({ x, y });
                     setCropRect((prev) => {
                       let { x: px, y: py, size } = prev;
-                      const max = rect.width; // square
+                      const maxWidth = rect.width;
+                      const maxHeight = rect.height;
+                      const maxSize = Math.min(maxWidth, maxHeight);
+                      
                       if (cropDragMode === "move") {
-                        px = Math.max(0, Math.min(max - size, px + dx));
-                        py = Math.max(0, Math.min(max - size, py + dy));
+                        px = Math.max(0, Math.min(maxWidth - size, px + dx));
+                        py = Math.max(0, Math.min(maxHeight - size, py + dy));
                         return { x: px, y: py, size };
                       }
                       // Resize keeping square
                       if (cropDragMode === "nw") {
                         px += dx; py += dy; size -= Math.max(dx, dy);
                       } else if (cropDragMode === "ne") {
-                        py += dy; size -= Math.max(-dx, dy); px = px; // right edge moves
+                        py += dy; size -= Math.max(-dx, dy);
                       } else if (cropDragMode === "sw") {
-                        px += dx; size -= Math.max(dx, -dy); py = py;
+                        px += dx; size -= Math.max(dx, -dy);
                       } else if (cropDragMode === "se") {
                         size += Math.max(dx, dy);
                       }
-                      size = Math.max(50, Math.min(max, size));
-                      px = Math.max(0, Math.min(max - size, px));
-                      py = Math.max(0, Math.min(max - size, py));
+                      size = Math.max(50, Math.min(maxSize, size));
+                      px = Math.max(0, Math.min(maxWidth - size, px));
+                      py = Math.max(0, Math.min(maxHeight - size, py));
                       return { x: px, y: py, size };
                     });
                   }}
@@ -869,11 +1073,11 @@ const MagicMaker = () => {
                     })}
                   </div>
                 </div>
-                <div className="mt-4 flex items-center gap-3">
+                <div className="mt-4 flex items-center gap-3 flex-shrink-0">
                   <span className="text-xs text-white/60">Zoom</span>
                   <input
                     type="range"
-                    min={0.4}
+                    min={minZoom}
                     max={3}
                     step={0.02}
                     value={cropScale}
@@ -881,22 +1085,29 @@ const MagicMaker = () => {
                     className="w-full"
                   />
                 </div>
-                <div className="mt-4 flex justify-end gap-2">
+                <div className="mt-4 flex justify-end gap-2 flex-shrink-0">
                   <button className="bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded px-4 py-2" onClick={() => setCropOpen(false)}>Cancel</button>
                   <button
                     className="bg-yellow-400 hover:bg-yellow-300 text-black font-semibold rounded px-4 py-2"
                     onClick={() => {
                       const viewCanvas = cropCanvasRef.current;
                       const img = cropImgRef.current;
-                      if (!viewCanvas || !img) return;
+                      const container = cropContainerRef.current;
+                      if (!viewCanvas || !img || !container) return;
+                      
+                      const rect = container.getBoundingClientRect();
+                      const containerWidth = rect.width;
+                      const containerHeight = rect.height;
+                      
                       const exportCanvas = document.createElement("canvas");
                       exportCanvas.width = 600; exportCanvas.height = 600;
                       const ctx = exportCanvas.getContext("2d");
                       if (!ctx) return;
+                      
                       const iw = img.naturalWidth * cropScale;
                       const ih = img.naturalHeight * cropScale;
-                      const cx = viewCanvas.width / 2 + cropOffset.x;
-                      const cy = viewCanvas.height / 2 + cropOffset.y;
+                      const cx = containerWidth / 2 + cropOffset.x;
+                      const cy = containerHeight / 2 + cropOffset.y;
                       const dx = cx - iw / 2;
                       const dy = cy - ih / 2;
                       const scaleExport = 600 / cropRect.size;
@@ -922,32 +1133,18 @@ const MagicMaker = () => {
           <div className="rounded-3xl bg-white/[0.06] border border-white/10 p-6 sm:p-8 mb-10">
             <div className="flex items-center gap-3 mb-6">
               <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-sky-300 via-purple-400 to-pink-400 flex items-center justify-center text-[#0f172a]">
-                <Palette className="h-6 w-6" />
+                <Sparkles className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold">Enter Prompt</h3>
-                <p className="text-sm text-white/70">Select a model to auto-populate the prompt, or enter your own.</p>
+                <h3 className="text-lg font-semibold">Generate Your 3D Model</h3>
+                <p className="text-sm text-white/70">Review your selections and create your 3D character model.</p>
               </div>
             </div>
 
             {readyForCustomization ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column - Controls and 3D Model Preview */}
                 <div className="space-y-6">
-                  <section>
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <h4 className="text-sm font-semibold text-white mb-2">Prompt</h4>
-                      <textarea
-                        value={customNotes}
-                        onChange={(e) => {
-                          setCustomNotes(e.target.value);
-                          setShowPreview(false);
-                        }}
-                        placeholder="Prompt will be auto-populated when you select a model."
-                        className="w-full min-h-[200px] rounded-xl border border-white/15 bg-[#0f172a]/60 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-300/40"
-                      />
-                    </div>
-                  </section>
-
                   <section className="rounded-2xl bg-white/8 border border-white/12 p-4">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-sky-300 via-purple-400 to-pink-400 flex items-center justify-center text-[#0f172a]">
@@ -955,79 +1152,193 @@ const MagicMaker = () => {
                       </div>
                       <div>
                         <div className="font-semibold text-white">Magic Maker Engine</div>
-                        <p className="text-xs text-white/70">We blend your custom colors, props, and photo details into a magical 3D render.</p>
+                        <p className="text-xs text-white/70">Generate and preview your 3D character</p>
                       </div>
                     </div>
                     <div className="space-y-3">
                       <button
                         type="button"
-                        onClick={() => setShowPreview(true)}
-                        disabled={!readyForPreview}
+                        onClick={startPreviewGeneration}
+                        disabled={!readyForPreview || previewGenerating}
                         className={`w-full inline-flex items-center justify-center rounded-2xl px-5 py-3 font-semibold transition-all ${
-                          readyForPreview ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-white/10 text-white/40 cursor-not-allowed"
+                          readyForPreview && !previewGenerating
+                            ? "bg-blue-500 text-white hover:bg-blue-600"
+                            : "bg-white/10 text-white/40 cursor-not-allowed"
                         }`}
                       >
-                        Preview
+                        {previewGenerating ? `Generating... ${Math.round(previewProgress)}%` : "Generate Preview"}
                       </button>
                       <button
                         type="button"
                         onClick={startGeneration}
-                        disabled={!readyForCustomization || generating}
+                        disabled={(!previewImageUrl && !showPreview) || generating}
                         className={`w-full inline-flex items-center justify-center rounded-2xl px-5 py-3 font-semibold transition-all ${
-                          readyForCustomization ? "bg-yellow-400 text-[#0f172a] hover:bg-yellow-300" : "bg-white/10 text-white/40 cursor-not-allowed"
+                          (previewImageUrl || showPreview) && !generating
+                            ? "bg-yellow-400 text-[#0f172a] hover:bg-yellow-300"
+                            : "bg-white/10 text-white/40 cursor-not-allowed"
                         } ${generating ? "animate-pulse" : ""}`}
                       >
-                        {generating ? "Creating model..." : "Create 3D Model"}
+                        {generating ? "Creating 3D Model..." : "Create 3D Model"}
                       </button>
-                      {!readyForCustomization && (
+                      {!previewImageUrl && !showPreview && (
                         <p className="text-xs text-white/50 text-center">
-                          Note: Models must be installed in ComfyUI for generation to work
+                          Generate preview first to see your character
                         </p>
+                      )}
+                      {showPreview && (
+                        <div className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                          <p className="text-xs font-semibold text-white mb-2">What's next?</p>
+                          <ul className="text-xs text-white/70 space-y-1.5 list-disc list-inside">
+                            <li>You can <span className="text-white font-medium">download</span> the preview image if you like it</li>
+                            <li>If you want to try again, click <span className="text-white font-medium">Retry</span> to generate a new preview</li>
+                            <li>Once you're <span className="text-white font-medium">satisfied</span> with the preview, click <span className="text-yellow-400 font-medium">Create 3D Model</span> to generate the final 3D model</li>
+                          </ul>
+                        </div>
                       )}
                     </div>
                   </section>
+
+                  {/* 3D Model Preview Section - Always visible */}
+                  <div className="rounded-2xl bg-white/8 border border-white/12 p-4">
+                    <h4 className="text-lg font-semibold text-white mb-4">3D Model</h4>
+                    {resultModelUrl && (resultModelUrl.endsWith('.glb') || resultModelUrl.endsWith('.obj')) ? (
+                      <>
+                        <div className="aspect-[2/3] rounded-xl overflow-hidden bg-black/60">
+                          <ModelViewer3D modelUrl={resultModelUrl} />
+                        </div>
+                        {resultFiles.length > 0 && (
+                          <div className="mt-4 space-y-2">
+                            <div className="text-xs font-semibold text-white">Download:</div>
+                            <div className="flex flex-wrap gap-2">
+                              {resultFiles.map((file, idx) => (
+                                <a
+                                  key={idx}
+                                  href={currentJobId ? getResultFileUrl(currentJobId, file) : '#'}
+                                  download
+                                  className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded px-3 py-1.5 text-white/80 hover:text-white transition-colors"
+                                >
+                                  {file.split('/').pop()}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : generating ? (
+                      <div className="aspect-[2/3] rounded-xl overflow-hidden bg-black/60 flex items-center justify-center">
+                        <div className="text-center space-y-4">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400 mx-auto"></div>
+                          <div className="text-white font-medium">Generating 3D Model...</div>
+                          <div className="text-xs text-white/60">{Math.round(progress)}% complete</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="aspect-[2/3] rounded-xl overflow-hidden bg-black/60 border-2 border-dashed border-white/20 flex items-center justify-center">
+                        <div className="text-center space-y-2 px-4">
+                          <div className="text-white/40 text-5xl mb-3">🎭</div>
+                          <p className="text-white/60 text-base font-medium">3D Model will appear here</p>
+                          <p className="text-white/40 text-sm">Click "Create 3D Model" to generate</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
+                {/* Right Column - Preview Image */}
                 <div className="space-y-6">
                   {showPreview ? (
                     <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <h4 className="text-sm font-semibold text-white mb-4">Live Preview</h4>
-                      <div className="aspect-square rounded-xl overflow-hidden bg-gradient-to-br from-purple-200 via-pink-200 to-orange-200 flex items-center justify-center">
-                        {model ? (
-                          <div className="relative w-full h-full">
-                            <img src={model.src} alt={`Preview of ${model.name}`} className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                              <div className="text-center text-white space-y-1 px-4">
-                                <div className="text-lg font-bold">3D Preview</div>
-                                <div className="text-sm opacity-90">{model.name}</div>
-                                <div className="text-xs opacity-75 mt-1 max-w-xs mx-auto">
-                                  Prompt: {customNotes.slice(0, 90)}
-                                  {customNotes.length > 90 ? "... " : ""}
-                                </div>
-                              </div>
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-semibold text-white">Preview Image</h4>
+                        {previewImageUrl && (
+                          <span className="text-xs text-green-400">✓ Generated</span>
+                        )}
+                      </div>
+                      
+                      <div className="aspect-[3/2] max-h-[300px] rounded-xl overflow-hidden bg-gradient-to-br from-purple-200 via-pink-200 to-orange-200 flex items-center justify-center relative">
+                        {previewGenerating ? (
+                          <div className="text-center space-y-4">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
+                            <div className="text-white font-medium">Generating preview... {Math.round(previewProgress)}%</div>
+                            <div className="w-64 bg-white/20 rounded-full h-2">
+                              <div
+                                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${previewProgress}%` }}
+                              />
                             </div>
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-sm px-3 py-2 text-center">
-                              Preview Mode
+                          </div>
+                        ) : previewImageUrl ? (
+                          <div className="relative w-full h-full">
+                            <img
+                              src={previewImageUrl}
+                              alt="Generated preview"
+                              className="w-full h-full object-contain"
+                            />
+                            <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                              {model?.name}
                             </div>
                           </div>
                         ) : (
-                          <div className="text-black/60 text-sm">Preview will appear here</div>
+                          // Dummy image for testing layout
+                          <div className="relative w-full h-full">
+                            <img
+                              src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&h=600&fit=crop"
+                              alt="Dummy preview for testing"
+                              className="w-full h-full object-contain"
+                            />
+                            <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                              {model?.name || "Test Preview"}
+                            </div>
+                            <div className="absolute bottom-2 left-2 bg-yellow-400/90 text-black text-xs px-2 py-1 rounded font-semibold">
+                              DUMMY IMAGE - FOR TESTING
+                            </div>
+                          </div>
                         )}
                       </div>
-                      <div className="mt-4">
-                        <button
-                          onClick={() => setShowPreview(false)}
-                          className="w-full inline-flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/20 py-2 px-4 text-sm font-medium transition-colors"
-                        >
-                          Try Again
-                        </button>
-                      </div>
+
+                      {(previewImageUrl || showPreview) && (
+                        <div className="mt-4 grid grid-cols-3 gap-2">
+                          <button
+                            onClick={() => {
+                              const imageUrl = previewImageUrl || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&h=600&fit=crop";
+                              const link = document.createElement('a');
+                              link.href = imageUrl;
+                              link.download = `preview-${model?.name || 'character'}.jpg`;
+                              link.click();
+                            }}
+                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/20 py-2 px-4 text-sm font-medium transition-colors"
+                          >
+                            <Download className="h-4 w-4" />
+                            Download
+                          </button>
+                          <button
+                            onClick={() => {
+                              setPreviewImageUrl(null);
+                              setPreviewJobId(null);
+                              setPreviewProgress(0);
+                              setPreviewGenerating(false);
+                              setGenerationStatus("idle");
+                              setGenerationMessage("");
+                            }}
+                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/20 py-2 px-4 text-sm font-medium transition-colors"
+                          >
+                            Retry
+                          </button>
+                          <button
+                            onClick={startGeneration}
+                            disabled={generating || (!previewImageUrl && !showPreview)}
+                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-yellow-400 hover:bg-yellow-300 text-black font-semibold py-2 px-4 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Create 3D Model
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 flex items-center justify-center py-12 text-center text-white/60">
                       <div className="max-w-md mx-auto space-y-2">
-                        <p className="font-semibold text-white">Enter a prompt and click Preview</p>
-                        <p className="text-sm">See how your 3D character will look before generating</p>
+                        <p className="font-semibold text-white">Ready to generate preview</p>
+                        <p className="text-sm">Upload image, select model, and click "Generate Preview"</p>
                       </div>
                     </div>
                   )}
@@ -1048,23 +1359,25 @@ const MagicMaker = () => {
                         </div>
                       </div>
                     )}
-                    {(generating || progress > 0) && (
+                    {(generating || progress > 0 || previewGenerating || previewProgress > 0) && (
                       <>
                         <div className="flex items-center justify-between text-[11px] text-white/50">
                           <span>Progress</span>
-                          <span>{progress}%</span>
+                          <span>{previewGenerating ? Math.round(previewProgress) : Math.round(progress)}%</span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
                           <div
                             className="h-full bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-400 transition-all duration-300"
-                            style={{ width: `${progress}%` }}
+                            style={{ width: `${previewGenerating ? previewProgress : progress}%` }}
                           />
                         </div>
                         <div className="text-[11px] text-white/50">
-                          {generating && estimatedSecondsLeft
+                          {previewGenerating
+                            ? `Generating preview... ${Math.round(previewProgress)}%`
+                            : generating && estimatedSecondsLeft
                             ? `Estimated time left: ~${estimatedSecondsLeft}s`
                             : generationStatus === "done"
-                              ? "Model ready! Scroll down to preview below."
+                              ? "Model ready! Check the preview above."
                               : null}
                         </div>
                       </>
@@ -1077,42 +1390,6 @@ const MagicMaker = () => {
                 <div className="max-w-md mx-auto space-y-2">
                   <p className="font-semibold text-white">Upload a picture and choose a cartoon model to get started.</p>
                   <p className="text-sm">The prompt will be auto-populated when you select a model.</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Large 3D preview */}
-          <div className="rounded-xl bg-white/[0.06] border border-white/10 p-2 sm:p-4">
-            <div className="aspect-[16/10] rounded-lg overflow-hidden bg-black/60">
-              {resultModelUrl && (resultModelUrl.endsWith('.glb') || resultModelUrl.endsWith('.obj')) ? (
-                <ModelViewer3D modelUrl={resultModelUrl} />
-              ) : resultModelUrl ? (
-                <div className="w-full h-full flex items-center justify-center">
-                  <img 
-                    src={resultModelUrl} 
-                    alt="Generated result" 
-                    className="max-w-full max-h-full object-contain"
-                  />
-                </div>
-              ) : (
-                <ModelViewer3D />
-              )}
-            </div>
-            {resultFiles.length > 0 && (
-              <div className="mt-4 space-y-2">
-                <div className="text-sm font-semibold text-white">Generated Files:</div>
-                <div className="flex flex-wrap gap-2">
-                  {resultFiles.map((file, idx) => (
-                    <a
-                      key={idx}
-                      href={currentJobId ? getResultFileUrl(currentJobId, file) : '#'}
-                      download
-                      className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded px-3 py-1.5 text-white/80 hover:text-white transition-colors"
-                    >
-                      {file.split('/').pop()}
-                    </a>
-                  ))}
                 </div>
               </div>
             )}
