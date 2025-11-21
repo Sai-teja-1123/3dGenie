@@ -1,5 +1,5 @@
 import ModelViewer3D from "@/components/ModelViewer3D";
-import { Upload, ArrowLeft, Twitter, Instagram, Facebook, ShoppingBag, Trash, Sparkles, Palette } from "lucide-react";
+import { Upload, ArrowLeft, Twitter, Instagram, Facebook, Trash, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaMale, FaFemale } from "react-icons/fa";
@@ -9,6 +9,7 @@ import {
   generateImage,
   pollJobStatus,
   getResultFileUrl,
+  cancelJob,
   ApiError,
 } from "@/services/api";
 import { Download } from "lucide-react";
@@ -60,9 +61,9 @@ const MagicMaker = () => {
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [rawImageUrl, setRawImageUrl] = useState<string | null>(null);
-  type ModelItem = { src: string; name: string };
-  const [model, setModel] = useState<ModelItem | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [model, setModel] = useState<string | null>(null);
+  const [boysList, setBoysList] = useState<string[]>([]);
+  const [girlsList, setGirlsList] = useState<string[]>([]);
   const [cropOpen, setCropOpen] = useState(false);
   const [cropScale, setCropScale] = useState(1.0);
   const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
@@ -94,6 +95,7 @@ const MagicMaker = () => {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [previewJobId, setPreviewJobId] = useState<string | null>(null);
   const [previewProgress, setPreviewProgress] = useState(0);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const user = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("auth_user") || "null"); } catch { return null; }
   }, []);
@@ -118,13 +120,15 @@ const MagicMaker = () => {
       return;
     }
 
-    if (!previewUrl) {
-      setGenerationMessage("Please upload an image first.");
+    // Use preview image if available, otherwise use original cropped image
+    const imageToUse = previewImageUrl || previewUrl;
+    if (!imageToUse) {
+      setGenerationMessage("Please generate a preview image first or upload an image.");
       return;
     }
 
     setGenerationStatus("running");
-    setGenerationMessage("Uploading image and starting generation...");
+    setGenerationMessage("Uploading image and starting 3D model generation...");
     setGenerating(true);
     setProgress(0);
     setResultFiles([]);
@@ -137,10 +141,10 @@ const MagicMaker = () => {
     }
 
     try {
-      // Convert preview URL to File
-      const response = await fetch(previewUrl);
+      // Convert image URL to File - use preview image if available
+      const response = await fetch(imageToUse);
       const blob = await response.blob();
-      const file = new File([blob], "uploaded-image.jpg", { type: blob.type });
+      const file = new File([blob], "preview-image.jpg", { type: blob.type });
 
       // Start generation
       setGenerationMessage("Submitting generation request...");
@@ -389,6 +393,8 @@ const MagicMaker = () => {
         const data = XLSX.utils.sheet_to_json(worksheet) as Array<Record<string, any>>;
         
         const map = new Map<string, string>();
+        const boys: string[] = [];
+        const girls: string[] = [];
         
         // Helper function to normalize model names for matching
         const normalizeName = (name: string): string => {
@@ -413,6 +419,9 @@ const MagicMaker = () => {
           const boyName = (row["BOY"] || row["Boy"] || "").toString().trim();
           const boyPrompt = (row["PROMPT"] || "").toString().trim();
           if (boyName && boyPrompt) {
+            if (!boys.includes(boyName)) {
+              boys.push(boyName);
+            }
             const normalized = normalizeName(boyName);
             map.set(normalized, boyPrompt);
             // Also store original name for exact match
@@ -423,6 +432,9 @@ const MagicMaker = () => {
           const girlName = (row["GIRL"] || row["Girl"] || "").toString().trim();
           const girlPrompt = (row["PROMPT_1"] || row["PROMPT"] || "").toString().trim();
           if (girlName && girlPrompt) {
+            if (!girls.includes(girlName)) {
+              girls.push(girlName);
+            }
             const normalized = normalizeName(girlName);
             map.set(normalized, girlPrompt);
             // Also store original name for exact match
@@ -442,6 +454,8 @@ const MagicMaker = () => {
           }
         });
         
+        setBoysList(boys.sort());
+        setGirlsList(girls.sort());
         setPromptsMap(map);
         setPromptsLoaded(true);
       } catch (error) {
@@ -456,7 +470,7 @@ const MagicMaker = () => {
   // Auto-populate prompt when model is selected
   useEffect(() => {
     if (model && promptsLoaded) {
-      const modelName = model.name;
+      const modelName = model;
       
       // Helper function to normalize model names for matching
       const normalizeName = (name: string): string => {
@@ -508,38 +522,7 @@ const MagicMaker = () => {
     }
   }, [model, promptsLoaded, promptsMap]);
 
-  const maleModels: ModelItem[] = [
-    { src: "/src/gallery 3d models/character-knight.png", name: "Knight" },
-    { src: "/src/gallery 3d models/character-superhero.png", name: "Superhero" },
-    { src: "/src/gallery 3d models/one_piece.jpg", name: "One Piece" },
-    { src: "/src/gallery 3d models/one_piece_blue.jpeg", name: "One Piece (Blue)" },
-    { src: "/src/gallery 3d models/3d-character-models/captain-america.jpg", name: "Captain America" },
-    { src: "/src/gallery 3d models/3d-character-models/goku.jpg", name: "Goku" },
-    { src: "/src/gallery 3d models/3d-character-models/iron-man.jpg", name: "Iron Man" },
-    { src: "/src/gallery 3d models/3d-character-models/luffy.jpg", name: "Luffy" },
-    { src: "/src/gallery 3d models/3d-character-models/naruto.jpg", name: "Naruto" },
-    { src: "/src/gallery 3d models/3d-character-models/spider-man.jpg", name: "Spider-Man" },
-    { src: "/src/gallery 3d models/3d-character-models/tanjiro.jpg", name: "Tanjiro" },
-  ];
-  const femaleModels: ModelItem[] = [
-    { src: "/src/gallery 3d models/character-fairy.png", name: "Fairy" },
-    { src: "/src/gallery 3d models/character-astronaut.png", name: "Astronaut" },
-    { src: "/src/gallery 3d models/moana_blue.jpeg", name: "Moana (Blue)" },
-    { src: "/src/gallery 3d models/snowwhite_blue.jpeg", name: "Snow White (Blue)" },
-    { src: "/src/gallery 3d models/Moana.jpg", name: "Moana" },
-    { src: "/src/gallery 3d models/Moana_bluebg.jpg", name: "Moana (Blue BG)" },
-    { src: "/src/gallery 3d models/Snow-white.jpg", name: "Snow White" },
-    { src: "/src/gallery 3d models/3d-character-models/anna.jpg", name: "Anna" },
-    { src: "/src/gallery 3d models/3d-character-models/ariel.jpg", name: "Ariel" },
-    { src: "/src/gallery 3d models/3d-character-models/belle.jpg", name: "Belle" },
-    { src: "/src/gallery 3d models/3d-character-models/cinderella.jpg", name: "Cinderella" },
-    { src: "/src/gallery 3d models/3d-character-models/elsa.jpg", name: "Elsa" },
-    { src: "/src/gallery 3d models/3d-character-models/moana.jpg", name: "Moana (Alt)" },
-    { src: "/src/gallery 3d models/3d-character-models/mulan.jpg", name: "Mulan" },
-    { src: "/src/gallery 3d models/3d-character-models/rapunzel.jpg", name: "Rapunzel" },
-    { src: "/src/gallery 3d models/3d-character-models/snow-white.jpg", name: "Snow White (Alt)" },
-  ];
-  const modelOptions: ModelItem[] = gender === "male" ? maleModels : gender === "female" ? femaleModels : [...maleModels, ...femaleModels];
+  const modelOptions: string[] = gender === "male" ? boysList : gender === "female" ? girlsList : [...boysList, ...girlsList];
 
   const MIN_AGE = 1;
   const MAX_AGE = 16;
@@ -622,26 +605,26 @@ const MagicMaker = () => {
   return (
     <div className="min-h-screen bg-[#0f172a] text-white flex flex-col">
       {/* Header */}
-      <header className="w-full border-b border-white/10">
+      <header className="w-full border-b border-white/5 backdrop-blur-xl bg-[#0f172a]/80 sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
-              className="inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/15 px-4 py-2 text-sm border border-white/10 transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 px-4 py-2 text-sm border border-white/10 backdrop-blur-sm transition-all hover:scale-105 hover:shadow-lg hover:shadow-white/5"
               onClick={() => navigate(-1)}
             >
               <ArrowLeft className="h-4 w-4" />
               Back
             </button>
           <div className="text-3xl sm:text-4xl font-black tracking-[0.25em] italic">
-            <span className="bg-gradient-to-r from-fuchsia-300 via-white to-sky-300 bg-clip-text text-transparent drop-shadow-lg">3DGENI</span>
+            <span className="bg-gradient-to-r from-fuchsia-300 via-white to-sky-300 bg-clip-text text-transparent drop-shadow-2xl">3DGENI</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <div
-              className="p-[2px] rounded-full bg-gradient-to-r from-fuchsia-500 via-violet-400 to-sky-400"
+              className="p-[2px] rounded-full bg-gradient-to-r from-fuchsia-500 via-violet-400 to-sky-400 shadow-lg shadow-fuchsia-500/20"
               title={user?.name || "Profile"}
             >
-              <div className="h-10 w-10 rounded-full bg-[#0f172a] text-white flex items-center justify-center font-extrabold tracking-wide">
+              <div className="h-10 w-10 rounded-full bg-[#0f172a] text-white flex items-center justify-center font-extrabold tracking-wide shadow-inner">
                 {(user?.name || "U").split("@")[0].slice(0,1).toUpperCase()}
               </div>
             </div>
@@ -650,33 +633,55 @@ const MagicMaker = () => {
       </header>
 
       {/* Main */}
-      <main className="flex-1 w-full">
+      <main className="flex-1 w-full" style={{ scrollBehavior: 'smooth' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
           {/* Headline */}
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6">
-            Transform your child's imagination into 3D magic!
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-8 text-white tracking-[0.02em] text-center">
+            <span className="inline-block transform-gpu bg-gradient-to-r from-white via-white to-white/90 bg-clip-text text-transparent" style={{
+              textShadow: `
+                0 2px 4px rgba(0, 0, 0, 0.3),
+                0 4px 8px rgba(0, 0, 0, 0.2),
+                0 8px 16px rgba(0, 0, 0, 0.1),
+                0 0 30px rgba(255, 255, 255, 0.15)
+              `,
+              transform: 'perspective(500px) rotateX(5deg)',
+              display: 'inline-block',
+              letterSpacing: '0.03em'
+            }}>
+              Transform your child's imagination into 3D magic!
+            </span>
           </h1>
 
-          {/* Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 items-stretch">
-            {/* Left: Upload card */}
-            <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4 sm:p-6 flex flex-col">
-              <div className="mb-4">
-                <div className="font-medium">Upload & Crop Photo</div>
-                <div className="text-sm text-white/70">Select a photo and crop to select the face</div>
+          {/* Top Section: Upload (Left) and Preview (Right) */}
+          <div className="flex justify-center mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full" style={{ maxWidth: '90%' }}>
+            {/* Left: Upload Photo */}
+            <div className="rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_48px_rgba(0,0,0,0.4),0_6px_24px_rgba(0,0,0,0.3)] transition-all duration-300 hover:border-white/20 focus-within:ring-2 focus-within:ring-white/20 focus-within:outline-none">
+              <div className="mb-5">
+                <div className="font-bold text-white text-lg mb-1 tracking-wide" style={{ textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)' }}>Upload any picture</div>
+                <div className="text-sm text-white/60 tracking-normal">Select from your device</div>
               </div>
               
               {/* Photo Preview Area */}
-              <div className="relative flex-1 min-h-[200px] rounded-lg overflow-hidden bg-gradient-to-br from-yellow-200 via-orange-200 to-sky-200 flex items-center justify-center mb-4">
+              <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-yellow-200 via-orange-200 to-sky-200 flex items-center justify-center shadow-[inset_0_2px_8px_rgba(0,0,0,0.1)] ring-1 ring-white/10 max-h-[60vh]">
                 {previewUrl ? (
                   <img src={previewUrl} alt="Upload preview" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="text-black/60 text-sm">Upload preview</div>
+                  <div className="text-center flex flex-col items-center justify-center h-full">
+                    <div className="text-black/60 text-sm mb-3">Upload preview</div>
+                    <button
+                      className="inline-flex items-center gap-2 rounded-xl bg-white text-[#0f172a] hover:bg-white/90 px-5 py-2.5 text-sm font-bold shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.2)] transition-all hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="h-4 w-4" />
+                      Upload Photo
+                    </button>
+                  </div>
                 )}
                 {previewUrl && (
                   <>
                     <button
-                      className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-full bg-black/70 hover:bg-red-600/80 text-white transition-colors"
+                      className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-xl bg-black/80 hover:bg-red-600/90 text-white transition-all shadow-lg hover:scale-110 backdrop-blur-sm"
                       onClick={() => {
                         if (previewUrl) URL.revokeObjectURL(previewUrl);
                         if (rawImageUrl) URL.revokeObjectURL(rawImageUrl);
@@ -687,6 +692,7 @@ const MagicMaker = () => {
                         setModel(null);
                         setCustomNotes("");
                         setShowPreview(false);
+                        setPreviewImageUrl(null);
                       }}
                       aria-label="Remove uploaded image"
                       title="Remove photo"
@@ -694,16 +700,56 @@ const MagicMaker = () => {
                       <Trash className="h-4 w-4" />
                     </button>
                     <button
-                      className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 hover:bg-black/90 text-white px-3 py-1.5 text-xs font-medium transition-colors"
-                      onClick={() => fileInputRef.current?.click()}
-                      title="Change photo"
+                      className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-xl bg-black/80 hover:bg-black/90 text-white px-3 py-1.5 text-xs font-medium transition-all shadow-lg hover:scale-105 backdrop-blur-sm"
+                      onClick={() => {
+                        setCropOpen(true);
+                        if (rawImageUrl) {
+                          setTimeout(() => {
+                            const img = new Image();
+                            img.onload = () => {
+                              cropImgRef.current = img;
+                              const container = cropContainerRef.current;
+                              if (container) {
+                                const initCrop = () => {
+                                  const rect = container.getBoundingClientRect();
+                                  const containerWidth = rect.width;
+                                  const containerHeight = rect.height;
+                                  
+                                  if (containerWidth <= 0 || containerHeight <= 0) {
+                                    setTimeout(initCrop, 50);
+                                    return;
+                                  }
+                                  
+                                  const scaleToFitWidth = containerWidth / img.naturalWidth;
+                                  const scaleToFitHeight = containerHeight / img.naturalHeight;
+                                  const scaleToFit = Math.min(scaleToFitWidth, scaleToFitHeight);
+                                  const calculatedMinZoom = scaleToFit * 0.3;
+                                  const finalMinZoom = Math.max(0.05, calculatedMinZoom);
+                                  setMinZoom(finalMinZoom);
+                                  const initialScale = scaleToFit * 0.95;
+                                  setCropScale(initialScale);
+                                  setCropOffset({ x: 0, y: 0 });
+                                  const containerSize = Math.min(containerWidth, containerHeight);
+                                  const cropSize = containerSize * 0.6;
+                                  const cropX = (containerWidth - cropSize) / 2;
+                                  const cropY = (containerHeight - cropSize) / 2;
+                                  setCropRect({ x: cropX, y: cropY, size: cropSize });
+                                  renderCrop();
+                                };
+                                initCrop();
+                              }
+                            };
+                            img.src = rawImageUrl;
+                          }, 100);
+                        }
+                      }}
+                      title="Crop photo"
                     >
                       <Upload className="h-3.5 w-3.5" />
-                      Change
+                      Crop
                     </button>
                   </>
                 )}
-                {/* Upload trigger inside the card */}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -715,54 +761,39 @@ const MagicMaker = () => {
                       const url = URL.createObjectURL(file);
                       if (rawImageUrl) URL.revokeObjectURL(rawImageUrl);
                       setRawImageUrl(url);
-                      // Directly open crop modal
                       setCropOpen(true);
                       setTimeout(() => {
-                        // initialize crop canvas and image
                         const img = new Image();
                         img.onload = () => {
                           cropImgRef.current = img;
                           const container = cropContainerRef.current;
                           if (container) {
-                            // Wait a bit for container to be fully rendered
                             const initCrop = () => {
                               const rect = container.getBoundingClientRect();
                               const containerWidth = rect.width;
                               const containerHeight = rect.height;
                               
                               if (containerWidth <= 0 || containerHeight <= 0) {
-                                // Retry if container not ready
                                 setTimeout(initCrop, 50);
                                 return;
                               }
                               
-                              // Calculate scale to fit entire image within container
                               const scaleToFitWidth = containerWidth / img.naturalWidth;
                               const scaleToFitHeight = containerHeight / img.naturalHeight;
                               const scaleToFit = Math.min(scaleToFitWidth, scaleToFitHeight);
-                              
-                              // Set minimum zoom to allow full image to be visible (with some margin)
-                              const calculatedMinZoom = scaleToFit * 0.3; // Allow zooming out to 30% of fit
-                              const finalMinZoom = Math.max(0.05, calculatedMinZoom); // Ensure minimum is at least 0.05
+                              const calculatedMinZoom = scaleToFit * 0.3;
+                              const finalMinZoom = Math.max(0.05, calculatedMinZoom);
                               setMinZoom(finalMinZoom);
-                              
-                              // Set initial scale to fill the container (95% to leave small margin)
-                              // This makes the image fill most of the available space
                               const initialScale = scaleToFit * 0.95;
                               setCropScale(initialScale);
                               setCropOffset({ x: 0, y: 0 });
-                              
-                              // Initialize crop rect to center, about 60% of the smaller dimension (keep it square)
                               const containerSize = Math.min(containerWidth, containerHeight);
                               const cropSize = containerSize * 0.6;
                               const cropX = (containerWidth - cropSize) / 2;
                               const cropY = (containerHeight - cropSize) / 2;
                               setCropRect({ x: cropX, y: cropY, size: cropSize });
-                              
-                              // Render the crop
                               renderCrop();
                             };
-                            
                             initCrop();
                           }
                         };
@@ -771,229 +802,113 @@ const MagicMaker = () => {
                     }
                   }}
                 />
-                <button
-                  className="absolute bottom-3 right-3 inline-flex items-center gap-2 rounded-full bg-white text-[#0f172a] hover:bg-white/90 px-4 py-2 text-sm"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="h-4 w-4" />
-                  Upload
-                </button>
-              </div>
-
-              {/* Prompt Section */}
-              <div>
-                <label className="block text-sm font-medium text-white/90 mb-2">Prompt</label>
-                <textarea
-                  value={customNotes}
-                  onChange={(e) => {
-                    setCustomNotes(e.target.value);
-                    setShowPreview(false);
-                  }}
-                  placeholder="Enter your prompt or it will be auto-populated when you select a model..."
-                  className="w-full min-h-[100px] rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 resize-none"
-                />
-                <div className="text-xs text-white/50 mt-1">Prompt will be auto-populated when you select a model</div>
               </div>
             </div>
 
-            {/* Right: Character selection card */}
-            <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4 sm:p-6 flex flex-col">
-              <div className="space-y-4 flex-1">
-                {/* Gender Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-white/90 mb-2">Select Gender</label>
-                  <div className="flex gap-4">
-                    <button
-                      className={`flex-1 flex flex-col items-center justify-center px-4 py-4 rounded-xl border-2 transition-all ${
-                        gender === 'male' 
-                          ? 'bg-yellow-400/20 border-yellow-400 text-yellow-300 scale-105' 
-                          : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10'
-                      }`}
-                      onClick={() => {
-                        setGender('male');
-                        setModel(null); // Reset model when gender changes
-                        setShowPreview(false);
-                      }}
-                      type="button"
-                    >
-                      <FaMale className="text-3xl mb-2" />
-                      <span className="text-sm font-medium">Boy</span>
-                    </button>
-                    <button
-                      className={`flex-1 flex flex-col items-center justify-center px-4 py-4 rounded-xl border-2 transition-all ${
-                        gender === 'female' 
-                          ? 'bg-pink-400/20 border-pink-400 text-pink-300 scale-105' 
-                          : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10'
-                      }`}
-                      onClick={() => {
-                        setGender('female');
-                        setModel(null); // Reset model when gender changes
-                        setShowPreview(false);
-                      }}
-                      type="button"
-                    >
-                      <FaFemale className="text-3xl mb-2" />
-                      <span className="text-sm font-medium">Girl</span>
-                    </button>
+            {/* Right: Preview Image */}
+            <div className="rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_48px_rgba(0,0,0,0.4),0_6px_24px_rgba(0,0,0,0.3)] transition-all duration-300 hover:border-white/20 focus-within:ring-2 focus-within:ring-white/20 focus-within:outline-none">
+              <div className="mb-5">
+                <div className="font-bold text-white text-lg mb-1 tracking-wide" style={{ textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)' }}>Choose a fun cartoon style</div>
+                <div className="text-sm text-white/60 tracking-normal">Pick a style that suits your child's personality</div>
+              </div>
+              
+              <div className="aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-purple-200 via-pink-200 to-orange-200 flex items-center justify-center relative mb-4 shadow-[inset_0_2px_8px_rgba(0,0,0,0.1)] ring-1 ring-white/10 max-h-[60vh]">
+                {previewGenerating ? (
+                  <div className="text-center space-y-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
+                    <div className="text-white font-medium">Generating preview... {Math.round(previewProgress)}%</div>
+                    <div className="w-48 bg-white/20 rounded-full h-2 mx-auto">
+                      <div
+                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${previewProgress}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
-
-                {/* Age Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-white/90 mb-2">Age (years)</label>
-                  <input
-                    type="number"
-                    value={age}
-                    onChange={e => {
-                      let val = parseInt(e.target.value.replace(/[^\d]/g, ""), 10);
-                      if (isNaN(val)) val = "";
-                      if (val !== "" && val < MIN_AGE) val = MIN_AGE;
-                      if (val > MAX_AGE) val = MAX_AGE;
-                      setAge(val === "" ? "" : String(val));
-                    }}
-                    min={MIN_AGE}
-                    max={MAX_AGE}
-                    className="w-full border border-white/20 bg-white/5 text-white rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
-                    placeholder={`Enter age (${MIN_AGE}-${MAX_AGE})`}
-                    maxLength={2}
-                    inputMode="numeric"
-                  />
-                  <div className="text-xs text-white/50 mt-1">Ages {MIN_AGE} to {MAX_AGE} only</div>
-                </div>
-
-                {/* Model Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-white/90 mb-2">Choose Model</label>
-                  <div className="relative aspect-square rounded-lg overflow-hidden bg-[#111827] flex items-center justify-center border border-white/10">
-                    {model ? (
-                      <>
-                        <img src={model.src} alt={model.name} className="w-full h-full object-cover" />
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-sm px-3 py-2 text-center font-medium">{model.name}</div>
-                        <button
-                          className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20"
-                          onClick={() => {
-                            setModel(null);
-                            setShowPreview(false);
-                          }}
-                          aria-label="Remove selected model"
-                        >
-                          <Trash className="h-4 w-4" />
-                        </button>
-                      </>
-                    ) : (
-                      <div className="text-white/50 text-sm text-center px-4">No model selected</div>
+                ) : previewImageUrl ? (
+                  <div className="relative w-full h-full">
+                    <img
+                      src={previewImageUrl}
+                      alt="Generated preview"
+                      className="w-full h-full object-cover"
+                    />
+                    {model && (
+                      <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                        {model}
+                      </div>
                     )}
-                    <button
-                      className="absolute bottom-3 right-3 inline-flex items-center gap-2 rounded-full bg-white text-[#0f172a] hover:bg-white/90 px-4 py-2 text-sm font-medium"
-                      onClick={() => setPickerOpen(true)}
-                      disabled={!gender}
-                    >
-                      <ShoppingBag className="h-4 w-4" />
-                      {model ? 'Change Model' : 'Choose Model'}
-                    </button>
-                  </div>
-                  {!gender && (
-                    <div className="text-xs text-white/50 mt-2">Please select gender first</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Model Picker Modal */}
-          {pickerOpen && (
-            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="w-full max-w-4xl bg-[#0b1222] text-white rounded-2xl border border-white/10 p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Pick a 3D model {gender && `(${gender === 'male' ? 'Boy' : 'Girl'})`}</h3>
-                  <button className="text-white/70 hover:text-white" onClick={() => setPickerOpen(false)}>Close</button>
-                </div>
-                {!gender ? (
-                  <div className="text-center py-8 text-white/60">
-                    Please select gender first
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 max-h-[60vh] overflow-auto">
-                    {modelOptions.map((item) => (
-                    <button
-                      key={item.src}
-                      className="relative rounded-xl overflow-hidden border border-white/10 hover:border-white/30 focus:outline-none"
-                      onClick={() => {
-                        setModel(item);
-                      setShowPreview(false);
-                        setPickerOpen(false);
-                        // Auto-populate prompt when model is selected
-                        if (promptsLoaded) {
-                          const normalizeName = (name: string): string => {
-                            return name
-                              .toLowerCase()
-                              .replace(/\s*-\s*/g, " ")
-                              .replace(/\s+/g, " ")
-                              .trim();
-                          };
-                          
-                          let prompt = promptsMap.get(item.name.toLowerCase());
-                          
-                          if (!prompt) {
-                            const normalized = normalizeName(item.name);
-                            prompt = promptsMap.get(normalized);
-                          }
-                          
-                          // Handle specific name variations
-                          const nameVariations: Record<string, string[]> = {
-                            "elsa": ["elsa", "elsa - frozen"],
-                            "anna": ["anna", "anna- frozen"],
-                            "ariel": ["ariel", "little mermaid"],
-                            "belle": ["belle", "belle - beauty and the beast"],
-                          };
-                          
-                          if (!prompt) {
-                            const lowerName = item.name.toLowerCase();
-                            for (const [base, variations] of Object.entries(nameVariations)) {
-                              if (variations.includes(lowerName) || lowerName === base) {
-                                for (const variation of variations) {
-                                  prompt = promptsMap.get(variation);
-                                  if (prompt) break;
-                                }
-                                if (prompt) break;
-                              }
-                            }
-                          }
-                          
-                          if (prompt) {
-                            setCustomNotes(prompt);
-                          } else {
-                            // Default prompt for models not in Excel (include model name)
-                            const defaultPrompt = `Create a 3D character model inspired by ${item.name}. Make it vibrant, playful, and suitable for children.`;
-                            setCustomNotes(defaultPrompt);
-                          }
-                        }
-                      }}
-                    >
-                      <img src={item.src} alt={item.name} className="w-full h-40 object-cover" />
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-2 py-1 text-center">{item.name}</div>
-                    </button>
-                    ))}
+                  <div className="text-center text-white/60 flex flex-col items-center justify-center h-full">
+                    <div className="text-4xl mb-2">🎨</div>
+                    <div className="text-sm">Preview will appear here</div>
                   </div>
                 )}
               </div>
+
+              {/* Download and Retry Buttons */}
+              {(previewImageUrl || showPreview) && (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => {
+                      const imageUrl = previewImageUrl || previewUrl || "";
+                      if (imageUrl) {
+                        const link = document.createElement('a');
+                        link.href = imageUrl;
+                        link.download = `preview-${model || 'character'}.jpg`;
+                        link.click();
+                      }
+                    }}
+                    disabled={!previewImageUrl && !previewUrl}
+                    className={`inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 py-2.5 px-4 text-sm font-medium transition-all backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-transparent ${
+                      (previewImageUrl || previewUrl)
+                        ? "bg-white/10 hover:bg-white/20 text-white hover:scale-105 hover:shadow-lg"
+                        : "bg-white/5 text-white/40 cursor-not-allowed"
+                    }`}
+                  >
+                    <Download className="h-4 w-4" />
+                    Download
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Clear current preview and restart generation
+                      setPreviewImageUrl(null);
+                      setPreviewJobId(null);
+                      setPreviewProgress(0);
+                      setPreviewGenerating(false);
+                      setShowPreview(false);
+                      setGenerationStatus("idle");
+                      setGenerationMessage("");
+                      // Restart the preview generation flow
+                      if (readyForPreview) {
+                        startPreviewGeneration();
+                      }
+                    }}
+                    disabled={!readyForPreview || previewGenerating}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 py-2.5 px-4 text-sm font-medium transition-all backdrop-blur-sm hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+            </div>
+          </div>
+
 
           {/* Crop Modal */}
           {cropOpen && (
-            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="w-full max-w-4xl max-h-[90vh] bg-[#0b1222] text-white rounded-2xl border border-white/10 p-4 sm:p-6 select-none flex flex-col">
-                <div className="flex items-center justify-between mb-4 flex-shrink-0">
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="w-full max-w-4xl max-h-[90vh] bg-[#0b1222]/95 backdrop-blur-xl text-white rounded-3xl border border-white/10 p-6 sm:p-8 select-none flex flex-col shadow-2xl shadow-black/50 overflow-y-auto">
+                <div className="flex items-center justify-between mb-6 flex-shrink-0">
                   <div>
-                    <h3 className="text-lg font-semibold">Crop to Select Face</h3>
+                    <h3 className="text-xl font-extrabold tracking-wide" style={{ textShadow: '0 2px 6px rgba(0, 0, 0, 0.3)' }}>Crop to Select Face</h3>
                     <p className="text-sm text-white/60 mt-1">Adjust the crop area to focus on the face</p>
                   </div>
-                  <button className="text-white/70 hover:text-white" onClick={() => setCropOpen(false)}>Close</button>
+                  <button className="text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/10 p-2" onClick={() => setCropOpen(false)}>Close</button>
                 </div>
                 <div
                   ref={cropContainerRef}
-                  className="relative w-full flex-1 min-h-0 rounded-xl overflow-hidden bg-black/70 border border-white/10 select-none"
+                  className="relative w-full flex-1 min-h-0 rounded-2xl overflow-hidden bg-black/70 border border-white/10 select-none shadow-2xl ring-1 ring-white/5"
                   style={{ minHeight: '400px', maxHeight: 'calc(90vh - 200px)', aspectRatio: '4 / 3' }}
                   onMouseDown={(e) => {
                     const rect = cropContainerRef.current?.getBoundingClientRect();
@@ -1085,10 +1000,10 @@ const MagicMaker = () => {
                     className="w-full"
                   />
                 </div>
-                <div className="mt-4 flex justify-end gap-2 flex-shrink-0">
-                  <button className="bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded px-4 py-2" onClick={() => setCropOpen(false)}>Cancel</button>
+                <div className="mt-6 flex justify-end gap-3 flex-shrink-0">
+                  <button className="bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded-xl px-6 py-3 font-medium transition-all hover:scale-105 hover:shadow-lg backdrop-blur-sm" onClick={() => setCropOpen(false)}>Cancel</button>
                   <button
-                    className="bg-yellow-400 hover:bg-yellow-300 text-black font-semibold rounded px-4 py-2"
+                    className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold rounded-xl px-8 py-3 transition-all hover:scale-105 hover:shadow-xl hover:shadow-yellow-400/30"
                     onClick={() => {
                       const viewCanvas = cropCanvasRef.current;
                       const img = cropImgRef.current;
@@ -1119,6 +1034,8 @@ const MagicMaker = () => {
                         if (previewUrl) URL.revokeObjectURL(previewUrl);
                         setPreviewUrl(url);
                         setCropOpen(false);
+                        // Open details modal after crop
+                        setShowDetailsModal(true);
                       }, "image/jpeg", 0.92);
                     }}
                   >
@@ -1129,273 +1046,319 @@ const MagicMaker = () => {
             </div>
           )}
 
-          {/* Creation flow */}
-          <div className="rounded-3xl bg-white/[0.06] border border-white/10 p-6 sm:p-8 mb-10">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-sky-300 via-purple-400 to-pink-400 flex items-center justify-center text-[#0f172a]">
-                <Sparkles className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">Generate Your 3D Model</h3>
-                <p className="text-sm text-white/70">Review your selections and create your 3D character model.</p>
-              </div>
+          {/* Action Buttons */}
+          {previewUrl && (
+            <div className="flex gap-4 mb-8 justify-center">
+              <button
+                type="button"
+                onClick={startGeneration}
+                disabled={!previewUrl || generating}
+                className={`inline-flex items-center justify-center rounded-2xl px-10 py-5 font-extrabold text-lg transition-all shadow-[0_8px_24px_rgba(0,0,0,0.3)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent ${
+                  previewUrl && !generating
+                    ? "bg-yellow-400 text-[#0f172a] hover:bg-yellow-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(234,179,8,0.4)] focus:ring-yellow-400/50"
+                    : "bg-white/10 text-white/40 cursor-not-allowed focus:ring-white/20"
+                } ${generating ? "animate-pulse shadow-yellow-400/30" : ""}`}
+              >
+                {generating ? `Creating 3D Model... ${Math.round(progress)}%` : "Create 3D Model"}
+              </button>
             </div>
+          )}
 
-            {readyForCustomization ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Column - Controls and 3D Model Preview */}
-                <div className="space-y-6">
-                  <section className="rounded-2xl bg-white/8 border border-white/12 p-4">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-sky-300 via-purple-400 to-pink-400 flex items-center justify-center text-[#0f172a]">
-                        <Sparkles className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-white">Magic Maker Engine</div>
-                        <p className="text-xs text-white/70">Generate and preview your 3D character</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
+          {/* 3D Model Viewer */}
+          {previewUrl && (
+            <div className="rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/10 p-8 shadow-[0_8px_32px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.2)]">
+              <div className="flex items-center justify-center mb-6">
+                <h4 className="text-xl font-extrabold text-white tracking-wide" style={{ textShadow: '0 2px 6px rgba(0, 0, 0, 0.3)' }}>3D Model</h4>
+                {resultModelUrl && (resultModelUrl.endsWith('.glb') || resultModelUrl.endsWith('.obj')) && (
+                  <div className="flex gap-2 ml-auto">
+                    <button
+                      onClick={() => {
+                        // Retry 3D generation
+                        setResultModelUrl(null);
+                        setResultFiles([]);
+                        setCurrentJobId(null);
+                        setProgress(0);
+                        setGenerationStatus("idle");
+                        setGenerationMessage("");
+                        if (previewImageUrl || previewUrl) {
+                          startGeneration();
+                        }
+                      }}
+                      disabled={generating}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 py-2.5 px-5 text-sm font-medium transition-all backdrop-blur-sm hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    >
+                      Retry
+                    </button>
+                    {resultFiles.length > 0 && (
                       <button
-                        type="button"
-                        onClick={startPreviewGeneration}
-                        disabled={!readyForPreview || previewGenerating}
-                        className={`w-full inline-flex items-center justify-center rounded-2xl px-5 py-3 font-semibold transition-all ${
-                          readyForPreview && !previewGenerating
-                            ? "bg-blue-500 text-white hover:bg-blue-600"
-                            : "bg-white/10 text-white/40 cursor-not-allowed"
-                        }`}
+                        onClick={() => {
+                          // Download all files
+                          resultFiles.forEach((file) => {
+                            if (currentJobId) {
+                              const link = document.createElement('a');
+                              link.href = getResultFileUrl(currentJobId, file);
+                              link.download = file.split('/').pop() || 'model';
+                              link.click();
+                            }
+                          });
+                        }}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-2.5 px-5 text-sm transition-all shadow-lg hover:scale-105 hover:shadow-yellow-400/30"
                       >
-                        {previewGenerating ? `Generating... ${Math.round(previewProgress)}%` : "Generate Preview"}
+                        <Download className="h-4 w-4" />
+                        Download All
                       </button>
-                      <button
-                        type="button"
-                        onClick={startGeneration}
-                        disabled={(!previewImageUrl && !showPreview) || generating}
-                        className={`w-full inline-flex items-center justify-center rounded-2xl px-5 py-3 font-semibold transition-all ${
-                          (previewImageUrl || showPreview) && !generating
-                            ? "bg-yellow-400 text-[#0f172a] hover:bg-yellow-300"
-                            : "bg-white/10 text-white/40 cursor-not-allowed"
-                        } ${generating ? "animate-pulse" : ""}`}
-                      >
-                        {generating ? "Creating 3D Model..." : "Create 3D Model"}
-                      </button>
-                      {!previewImageUrl && !showPreview && (
-                        <p className="text-xs text-white/50 text-center">
-                          Generate preview first to see your character
-                        </p>
-                      )}
-                      {showPreview && (
-                        <div className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
-                          <p className="text-xs font-semibold text-white mb-2">What's next?</p>
-                          <ul className="text-xs text-white/70 space-y-1.5 list-disc list-inside">
-                            <li>You can <span className="text-white font-medium">download</span> the preview image if you like it</li>
-                            <li>If you want to try again, click <span className="text-white font-medium">Retry</span> to generate a new preview</li>
-                            <li>Once you're <span className="text-white font-medium">satisfied</span> with the preview, click <span className="text-yellow-400 font-medium">Create 3D Model</span> to generate the final 3D model</li>
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </section>
-
-                  {/* 3D Model Preview Section - Always visible */}
-                  <div className="rounded-2xl bg-white/8 border border-white/12 p-4">
-                    <h4 className="text-lg font-semibold text-white mb-4">3D Model</h4>
-                    {resultModelUrl && (resultModelUrl.endsWith('.glb') || resultModelUrl.endsWith('.obj')) ? (
-                      <>
-                        <div className="aspect-[2/3] rounded-xl overflow-hidden bg-black/60">
-                          <ModelViewer3D modelUrl={resultModelUrl} />
-                        </div>
-                        {resultFiles.length > 0 && (
-                          <div className="mt-4 space-y-2">
-                            <div className="text-xs font-semibold text-white">Download:</div>
-                            <div className="flex flex-wrap gap-2">
-                              {resultFiles.map((file, idx) => (
-                                <a
-                                  key={idx}
-                                  href={currentJobId ? getResultFileUrl(currentJobId, file) : '#'}
-                                  download
-                                  className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded px-3 py-1.5 text-white/80 hover:text-white transition-colors"
-                                >
-                                  {file.split('/').pop()}
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    ) : generating ? (
-                      <div className="aspect-[2/3] rounded-xl overflow-hidden bg-black/60 flex items-center justify-center">
-                        <div className="text-center space-y-4">
-                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400 mx-auto"></div>
-                          <div className="text-white font-medium">Generating 3D Model...</div>
-                          <div className="text-xs text-white/60">{Math.round(progress)}% complete</div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="aspect-[2/3] rounded-xl overflow-hidden bg-black/60 border-2 border-dashed border-white/20 flex items-center justify-center">
-                        <div className="text-center space-y-2 px-4">
-                          <div className="text-white/40 text-5xl mb-3">🎭</div>
-                          <p className="text-white/60 text-base font-medium">3D Model will appear here</p>
-                          <p className="text-white/40 text-sm">Click "Create 3D Model" to generate</p>
-                        </div>
-                      </div>
                     )}
                   </div>
-                </div>
-
-                {/* Right Column - Preview Image */}
-                <div className="space-y-6">
-                  {showPreview ? (
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-sm font-semibold text-white">Preview Image</h4>
-                        {previewImageUrl && (
-                          <span className="text-xs text-green-400">✓ Generated</span>
-                        )}
-                      </div>
-                      
-                      <div className="aspect-[3/2] max-h-[300px] rounded-xl overflow-hidden bg-gradient-to-br from-purple-200 via-pink-200 to-orange-200 flex items-center justify-center relative">
-                        {previewGenerating ? (
-                          <div className="text-center space-y-4">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
-                            <div className="text-white font-medium">Generating preview... {Math.round(previewProgress)}%</div>
-                            <div className="w-64 bg-white/20 rounded-full h-2">
-                              <div
-                                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${previewProgress}%` }}
-                              />
-                            </div>
-                          </div>
-                        ) : previewImageUrl ? (
-                          <div className="relative w-full h-full">
-                            <img
-                              src={previewImageUrl}
-                              alt="Generated preview"
-                              className="w-full h-full object-contain"
-                            />
-                            <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                              {model?.name}
-                            </div>
-                          </div>
-                        ) : (
-                          // Dummy image for testing layout
-                          <div className="relative w-full h-full">
-                            <img
-                              src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&h=600&fit=crop"
-                              alt="Dummy preview for testing"
-                              className="w-full h-full object-contain"
-                            />
-                            <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                              {model?.name || "Test Preview"}
-                            </div>
-                            <div className="absolute bottom-2 left-2 bg-yellow-400/90 text-black text-xs px-2 py-1 rounded font-semibold">
-                              DUMMY IMAGE - FOR TESTING
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {(previewImageUrl || showPreview) && (
-                        <div className="mt-4 grid grid-cols-3 gap-2">
-                          <button
-                            onClick={() => {
-                              const imageUrl = previewImageUrl || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&h=600&fit=crop";
-                              const link = document.createElement('a');
-                              link.href = imageUrl;
-                              link.download = `preview-${model?.name || 'character'}.jpg`;
-                              link.click();
-                            }}
-                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/20 py-2 px-4 text-sm font-medium transition-colors"
+                )}
+              </div>
+              {resultModelUrl && (resultModelUrl.endsWith('.glb') || resultModelUrl.endsWith('.obj')) ? (
+                <div className="flex flex-col items-center gap-8">
+                  <div className="w-full max-w-4xl">
+                    <div className="aspect-[16/9] max-h-[450px] rounded-2xl overflow-hidden bg-black/60 shadow-2xl ring-1 ring-white/10">
+                      <ModelViewer3D modelUrl={resultModelUrl} />
+                    </div>
+                  </div>
+                  {resultFiles.length > 0 && (
+                    <div className="space-y-4 w-full max-w-4xl">
+                      <div className="text-sm font-semibold text-white text-center">Download Files:</div>
+                      <div className="flex flex-col gap-2">
+                        {resultFiles.map((file, idx) => (
+                          <a
+                            key={idx}
+                            href={currentJobId ? getResultFileUrl(currentJobId, file) : '#'}
+                            download
+                            className="inline-flex items-center justify-center gap-2 text-sm bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl px-4 py-3 text-white/80 hover:text-white transition-all backdrop-blur-sm hover:scale-105 hover:shadow-lg"
                           >
                             <Download className="h-4 w-4" />
-                            Download
-                          </button>
-                          <button
-                            onClick={() => {
-                              setPreviewImageUrl(null);
-                              setPreviewJobId(null);
-                              setPreviewProgress(0);
-                              setPreviewGenerating(false);
-                              setGenerationStatus("idle");
-                              setGenerationMessage("");
-                            }}
-                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/20 py-2 px-4 text-sm font-medium transition-colors"
-                          >
-                            Retry
-                          </button>
-                          <button
-                            onClick={startGeneration}
-                            disabled={generating || (!previewImageUrl && !showPreview)}
-                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-yellow-400 hover:bg-yellow-300 text-black font-semibold py-2 px-4 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Create 3D Model
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 flex items-center justify-center py-12 text-center text-white/60">
-                      <div className="max-w-md mx-auto space-y-2">
-                        <p className="font-semibold text-white">Ready to generate preview</p>
-                        <p className="text-sm">Upload image, select model, and click "Generate Preview"</p>
+                            {file.split('/').pop()}
+                          </a>
+                        ))}
                       </div>
                     </div>
                   )}
-
-                  <div
-                    className={`rounded-xl border p-3 text-xs space-y-2 ${
-                      generationStatus === "error" ? "bg-red-500/10 border-red-500/30 text-red-200" : "bg-black/40 border-white/10 text-white/70"
-                    }`}
-                  >
-                    <div className={`font-semibold ${generationStatus === "error" ? "text-red-300" : "text-white"}`}>Status</div>
-                    <p className={generationStatus === "error" ? "text-red-200" : ""}>{statusMessage}</p>
-                    {generationStatus === "error" && (
-                      <div className="mt-2 p-2 bg-red-500/20 border border-red-500/30 rounded-lg text-[11px]">
-                        <div className="font-semibold mb-1">Missing Models?</div>
-                        <div className="text-red-200/80">
-                          Generation requires models to be installed in ComfyUI. Check{" "}
-                          <code className="bg-black/30 px-1 rounded">backend/MODELS_SETUP.md</code> for setup instructions.
-                        </div>
-                      </div>
-                    )}
-                    {(generating || progress > 0 || previewGenerating || previewProgress > 0) && (
-                      <>
-                        <div className="flex items-center justify-between text-[11px] text-white/50">
-                          <span>Progress</span>
-                          <span>{previewGenerating ? Math.round(previewProgress) : Math.round(progress)}%</span>
-                        </div>
-                        <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-400 transition-all duration-300"
-                            style={{ width: `${previewGenerating ? previewProgress : progress}%` }}
-                          />
-                        </div>
-                        <div className="text-[11px] text-white/50">
-                          {previewGenerating
-                            ? `Generating preview... ${Math.round(previewProgress)}%`
-                            : generating && estimatedSecondsLeft
-                            ? `Estimated time left: ~${estimatedSecondsLeft}s`
-                            : generationStatus === "done"
-                              ? "Model ready! Check the preview above."
-                              : null}
-                        </div>
-                      </>
-                    )}
+                </div>
+              ) : generating ? (
+                <div className="aspect-[16/9] max-h-[450px] max-w-4xl mx-auto rounded-2xl overflow-hidden bg-black/60 flex items-center justify-center shadow-2xl ring-1 ring-white/10">
+                  <div className="text-center space-y-5 px-4">
+                    <div className="animate-spin rounded-full h-20 w-20 border-4 border-white/20 border-t-yellow-400 mx-auto shadow-lg"></div>
+                    <div className="text-white font-semibold text-xl">Generating 3D Model...</div>
+                    <div className="text-sm text-white/70">{Math.round(progress)}% complete</div>
+                    <div className="w-72 mx-auto bg-white/10 rounded-full h-2.5 shadow-inner">
+                      <div
+                        className="bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500 h-2.5 rounded-full transition-all duration-300 shadow-lg shadow-yellow-400/30"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        // Cancel generation
+                        if (currentJobId) {
+                          try {
+                            await cancelJob(currentJobId);
+                          } catch (error) {
+                            console.error("Failed to cancel job:", error);
+                          }
+                        }
+                        setGenerating(false);
+                        setProgress(0);
+                        setGenerationStatus("idle");
+                        setGenerationMessage("Generation cancelled");
+                        setCurrentJobId(null);
+                      }}
+                      className="mt-4 text-sm text-white/60 hover:text-white underline transition-colors"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center rounded-xl border border-dashed border-white/15 bg-white/5 py-12 text-center text-white/60">
-                <div className="max-w-md mx-auto space-y-2">
-                  <p className="font-semibold text-white">Upload a picture and choose a cartoon model to get started.</p>
-                  <p className="text-sm">The prompt will be auto-populated when you select a model.</p>
+              ) : (
+                <div className="aspect-[16/9] max-h-[450px] max-w-4xl mx-auto rounded-2xl overflow-hidden bg-black/60 border-2 border-dashed border-white/10 flex items-center justify-center shadow-inner">
+                  <div className="text-center space-y-4 px-4">
+                    <div className="text-white/30 text-7xl mb-4 drop-shadow-2xl">🎭</div>
+                    <p className="text-white/70 text-xl font-semibold">3D Model will appear here</p>
+                    <p className="text-white/50 text-base">Click "Create 3D Model" to generate</p>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
+
+      {/* Details Modal (Gender/Age/Model) */}
+      {showDetailsModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-[#0b1222]/95 backdrop-blur-xl text-white rounded-3xl border border-white/10 p-8 shadow-2xl shadow-black/50">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-2xl font-bold tracking-tight">Select Character Details</h3>
+              <button className="text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/10 p-2" onClick={() => setShowDetailsModal(false)}>Close</button>
+            </div>
+            
+            <div className="space-y-6">
+              {/* Gender Selection */}
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-3">Select Gender</label>
+                <div className="flex gap-4">
+                  <button
+                    className={`flex-1 flex flex-col items-center justify-center px-4 py-5 rounded-2xl border-2 transition-all backdrop-blur-sm ${
+                      gender === 'male' 
+                        ? 'bg-yellow-400/20 border-yellow-400 text-yellow-300 scale-105 shadow-lg shadow-yellow-400/20' 
+                        : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:scale-105 hover:shadow-lg'
+                    }`}
+                    onClick={() => {
+                      setGender('male');
+                      setModel(null);
+                      setShowPreview(false);
+                    }}
+                    type="button"
+                  >
+                    <FaMale className="text-3xl mb-2" />
+                    <span className="text-sm font-medium">Boy</span>
+                  </button>
+                  <button
+                    className={`flex-1 flex flex-col items-center justify-center px-4 py-5 rounded-2xl border-2 transition-all backdrop-blur-sm ${
+                      gender === 'female' 
+                        ? 'bg-pink-400/20 border-pink-400 text-pink-300 scale-105 shadow-lg shadow-pink-400/20' 
+                        : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:scale-105 hover:shadow-lg'
+                    }`}
+                    onClick={() => {
+                      setGender('female');
+                      setModel(null);
+                      setShowPreview(false);
+                    }}
+                    type="button"
+                  >
+                    <FaFemale className="text-3xl mb-2" />
+                    <span className="text-sm font-medium">Girl</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Age Selection */}
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">Age (years)</label>
+                <input
+                  type="number"
+                  value={age}
+                  onChange={e => {
+                    let val = parseInt(e.target.value.replace(/[^\d]/g, ""), 10);
+                    if (isNaN(val)) val = "";
+                    if (val !== "" && val < MIN_AGE) val = MIN_AGE;
+                    if (val > MAX_AGE) val = MAX_AGE;
+                    setAge(val === "" ? "" : String(val));
+                  }}
+                  min={MIN_AGE}
+                  max={MAX_AGE}
+                  className="w-full border border-white/20 bg-white/5 backdrop-blur-sm text-white rounded-xl px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all shadow-inner"
+                  placeholder={`Enter age (${MIN_AGE}-${MAX_AGE})`}
+                  maxLength={2}
+                  inputMode="numeric"
+                />
+                <div className="text-xs text-white/50 mt-1">Ages {MIN_AGE} to {MAX_AGE} only</div>
+              </div>
+
+              {/* Model Selection */}
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">Choose Character</label>
+                <select
+                  value={model || ""}
+                  onChange={(e) => {
+                    const selectedName = e.target.value;
+                    if (selectedName) {
+                      setModel(selectedName);
+                      setShowPreview(false);
+                      if (promptsLoaded) {
+                        const normalizeName = (name: string): string => {
+                          return name
+                            .toLowerCase()
+                            .replace(/\s*-\s*/g, " ")
+                            .replace(/\s+/g, " ")
+                            .trim();
+                        };
+                        
+                        let prompt = promptsMap.get(selectedName.toLowerCase());
+                        
+                        if (!prompt) {
+                          const normalized = normalizeName(selectedName);
+                          prompt = promptsMap.get(normalized);
+                        }
+                        
+                        const nameVariations: Record<string, string[]> = {
+                          "elsa": ["elsa", "elsa - frozen"],
+                          "anna": ["anna", "anna- frozen"],
+                          "ariel": ["ariel", "little mermaid"],
+                          "belle": ["belle", "belle - beauty and the beast"],
+                        };
+                        
+                        if (!prompt) {
+                          const lowerName = selectedName.toLowerCase();
+                          for (const [base, variations] of Object.entries(nameVariations)) {
+                            if (variations.includes(lowerName) || lowerName === base) {
+                              for (const variation of variations) {
+                                prompt = promptsMap.get(variation);
+                                if (prompt) break;
+                              }
+                              if (prompt) break;
+                            }
+                          }
+                        }
+                        
+                        if (prompt) {
+                          setCustomNotes(prompt);
+                        } else {
+                          const defaultPrompt = `Create a 3D character model inspired by ${selectedName}. Make it vibrant, playful, and suitable for children.`;
+                          setCustomNotes(defaultPrompt);
+                        }
+                      }
+                    } else {
+                      setModel(null);
+                      setShowPreview(false);
+                    }
+                  }}
+                  disabled={!gender || !promptsLoaded}
+                  className="w-full border border-white/20 bg-white/5 backdrop-blur-sm text-white rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-inner"
+                >
+                  <option value="">{!gender ? "Select gender first" : !promptsLoaded ? "Loading characters..." : "Choose a character"}</option>
+                  {modelOptions.map((characterName) => (
+                    <option key={characterName} value={characterName} className="bg-[#0f172a] text-white">
+                      {characterName}
+                    </option>
+                  ))}
+                </select>
+                {!gender && (
+                  <div className="text-xs text-white/50 mt-2">Please select gender first</div>
+                )}
+              </div>
+
+              {/* Done Button */}
+              <div className="flex justify-end gap-3 pt-6">
+                <button
+                  className="bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded-xl px-6 py-3 font-medium transition-all hover:scale-105 hover:shadow-lg backdrop-blur-sm"
+                  onClick={() => setShowDetailsModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold rounded-xl px-8 py-3 transition-all hover:scale-105 hover:shadow-xl hover:shadow-yellow-400/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  onClick={() => {
+                    if (gender && age && model) {
+                      setShowDetailsModal(false);
+                      // Auto-generate preview
+                      if (readyForPreview) {
+                        startPreviewGeneration();
+                      }
+                    }
+                  }}
+                  disabled={!gender || !age || !model}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Footer */}
       <footer className="mt-auto w-full py-8 border-t border-white/10">

@@ -210,6 +210,26 @@ export async function pollJobStatus(
 }
 
 /**
+ * Cancel a running job
+ */
+export async function cancelJob(jobId: string): Promise<{ message: string; cancelled: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/api/cancel/${jobId}`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new ApiError(
+      errorData.detail || `HTTP ${response.status}: ${response.statusText}`,
+      response.status,
+      errorData
+    );
+  }
+
+  return response.json();
+}
+
+/**
  * Get result file URL for display
  */
 export function getResultFileUrl(jobId: string, filename: string): string {
