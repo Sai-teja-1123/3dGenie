@@ -1,0 +1,296 @@
+{
+    "id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+    "revision": 0,
+    "last_node_id": 11,
+    "last_link_id": 15,
+    "nodes": [
+      {
+        "id": 1,
+        "type": "CheckpointLoaderSimple",
+        "pos": [200, 80],
+        "size": [300, 150],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          { "name": "MODEL", "type": "MODEL", "links": [1, 10] },
+          { "name": "CLIP",  "type": "CLIP",  "links": [2, 3] },
+          { "name": "VAE",   "type": "VAE",   "links": [14] }
+        ],
+        "properties": {
+          "Node name for S&R": "CheckpointLoaderSimple"
+        },
+        "widgets_values": [
+          "sd_xl_base_1.0.safetensors",
+          "None",
+          "fp16"
+        ]
+      },
+      {
+        "id": 2,
+        "type": "CLIPTextEncode",
+        "pos": [550, 40],
+        "size": [420, 260],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [
+          { "name": "clip", "type": "CLIP", "link": 2 }
+        ],
+        "outputs": [
+          { "name": "CONDITIONING", "type": "CONDITIONING", "links": [4] }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.77",
+          "Node name for S&R": "CLIPTextEncode"
+        },
+        "widgets_values": [
+          "Create a 3D cartoon-style toy figure of a superhero with exaggerated proportions, smooth plastic material, simple clean details and a heroic stance, optimized for 3D printing with solid geometry, watertight mesh, no thin or floating parts, and minimal overhangs."
+        ]
+      },
+      {
+        "id": 3,
+        "type": "CLIPTextEncode",
+        "pos": [550, 340],
+        "size": [420, 220],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [
+          { "name": "clip", "type": "CLIP", "link": 3 }
+        ],
+        "outputs": [
+          { "name": "CONDITIONING", "type": "CONDITIONING", "links": [5] }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.77",
+          "Node name for S&R": "CLIPTextEncode"
+        },
+        "widgets_values": [
+          "blurry, deformed face, bad anatomy, extra limbs, extra fingers, low quality, distortions"
+        ]
+      },
+      {
+        "id": 4,
+        "type": "LoadImage",
+        "pos": [200, 360],
+        "size": [300, 320],
+        "flags": {},
+        "order": 3,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          { "name": "IMAGE", "type": "IMAGE", "links": [6] },
+          { "name": "MASK",  "type": "MASK",  "links": null }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.77",
+          "Node name for S&R": "LoadImage"
+        },
+        "widgets_values": [
+          "face_reference.png",
+          "image"
+        ]
+      },
+      {
+        "id": 5,
+        "type": "FaceAnalysis",
+        "pos": [550, 640],
+        "size": [320, 160],
+        "flags": {},
+        "order": 4,
+        "mode": 0,
+        "inputs": [
+          { "name": "image", "type": "IMAGE", "link": 6 }
+        ],
+        "outputs": [
+          { "name": "FACE_EMBEDDING", "type": "FACE_EMBEDDING", "links": [7] }
+        ],
+        "properties": {
+          "Node name for S&R": "FaceAnalysis"
+        },
+        "widgets_values": [
+          "insightface",
+          0
+        ]
+      },
+      {
+        "id": 6,
+        "type": "InstantIDLoader",
+        "pos": [550, 840],
+        "size": [320, 130],
+        "flags": {},
+        "order": 5,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          { "name": "INSTANTID_MODEL", "type": "INSTANTID_MODEL", "links": [8] }
+        ],
+        "properties": {
+          "Node name for S&R": "InstantIDLoader"
+        },
+        "widgets_values": [
+          "instantid_sdxl.safetensors"
+        ]
+      },
+      {
+        "id": 7,
+        "type": "ApplyInstantID",
+        "pos": [950, 160],
+        "size": [340, 360],
+        "flags": {},
+        "order": 6,
+        "mode": 0,
+        "inputs": [
+          { "name": "model",          "type": "MODEL",            "link": 1 },
+          { "name": "positive",       "type": "CONDITIONING",     "link": 4 },
+          { "name": "negative",       "type": "CONDITIONING",     "link": 5 },
+          { "name": "face_embedding", "type": "FACE_EMBEDDING",   "link": 7 },
+          { "name": "instantid_model","type": "INSTANTID_MODEL",  "link": 8 }
+        ],
+        "outputs": [
+          { "name": "MODEL",          "type": "MODEL",         "links": [10] },
+          { "name": "POSITIVE",       "type": "CONDITIONING",  "links": [11] },
+          { "name": "NEGATIVE",       "type": "CONDITIONING",  "links": [12] }
+        ],
+        "properties": {
+          "Node name for S&R": "ApplyInstantID"
+        },
+        "widgets_values": [
+          0.85,
+          0.60,
+          0.30
+        ]
+      },
+      {
+        "id": 8,
+        "type": "EmptyLatentImage",
+        "pos": [950, 560],
+        "size": [260, 140],
+        "flags": {},
+        "order": 7,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          { "name": "LATENT", "type": "LATENT", "links": [9] }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.77",
+          "Node name for S&R": "EmptyLatentImage"
+        },
+        "widgets_values": [
+          1024,
+          1024,
+          1
+        ]
+      },
+      {
+        "id": 9,
+        "type": "KSampler",
+        "pos": [1320, 200],
+        "size": [320, 380],
+        "flags": {},
+        "order": 8,
+        "mode": 0,
+        "inputs": [
+          { "name": "model",        "type": "MODEL",         "link": 10 },
+          { "name": "positive",     "type": "CONDITIONING",  "link": 11 },
+          { "name": "negative",     "type": "CONDITIONING",  "link": 12 },
+          { "name": "latent_image", "type": "LATENT",        "link": 9 }
+        ],
+        "outputs": [
+          { "name": "LATENT", "type": "LATENT", "links": [13] }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.77",
+          "Node name for S&R": "KSampler"
+        },
+        "widgets_values": [
+          123456789,
+          "randomize",
+          28,
+          6.5,
+          "dpmpp_2m",
+          "karras",
+          0.85
+        ]
+      },
+      {
+        "id": 10,
+        "type": "VAEDecode",
+        "pos": [1680, 240],
+        "size": [260, 140],
+        "flags": {},
+        "order": 9,
+        "mode": 0,
+        "inputs": [
+          { "name": "samples", "type": "LATENT", "link": 13 },
+          { "name": "vae",     "type": "VAE",    "link": 14 }
+        ],
+        "outputs": [
+          { "name": "IMAGE", "type": "IMAGE", "links": [15] }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.77",
+          "Node name for S&R": "VAEDecode"
+        },
+        "widgets_values": []
+      },
+      {
+        "id": 11,
+        "type": "SaveImage",
+        "pos": [1980, 200],
+        "size": [300, 260],
+        "flags": {},
+        "order": 10,
+        "mode": 0,
+        "inputs": [
+          { "name": "images", "type": "IMAGE", "link": 15 }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.77",
+          "Node name for S&R": "SaveImage"
+        },
+        "widgets_values": [
+          "InstantID_SDXL_Toy"
+        ]
+      }
+    ],
+    "links": [
+      [1, 1, 0, 7, 0, "MODEL"],
+      [2, 1, 1, 2, 0, "CLIP"],
+      [3, 1, 1, 3, 0, "CLIP"],
+      [4, 2, 0, 7, 1, "CONDITIONING"],
+      [5, 3, 0, 7, 2, "CONDITIONING"],
+      [6, 4, 0, 5, 0, "IMAGE"],
+      [7, 5, 0, 7, 3, "FACE_EMBEDDING"],
+      [8, 6, 0, 7, 4, "INSTANTID_MODEL"],
+      [9, 8, 0, 9, 3, "LATENT"],
+      [10, 7, 0, 9, 0, "MODEL"],
+      [11, 7, 1, 9, 1, "CONDITIONING"],
+      [12, 7, 2, 9, 2, "CONDITIONING"],
+      [13, 9, 0, 10, 0, "LATENT"],
+      [14, 1, 2, 10, 1, "VAE"],
+      [15, 10, 0, 11, 0, "IMAGE"]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "ds": {
+        "scale": 0.7,
+        "offset": [0, 0]
+      },
+      "workflowRendererVersion": "Vue",
+      "frontendVersion": "1.32.10"
+    },
+    "version": 0.4
+  }

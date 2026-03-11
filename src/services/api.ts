@@ -237,6 +237,84 @@ export function getResultFileUrl(jobId: string, filename: string): string {
 }
 
 /**
+ * Razorpay: Create order for payment
+ */
+export async function createPaymentOrder(
+  plan: string,
+  authToken?: string | null
+): Promise<{
+  order_id: string;
+  amount: number;
+  currency: string;
+  key_id: string;
+}> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/payments/create-order`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ plan }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new ApiError(
+      errorData.detail || `Failed to create order: ${response.statusText}`,
+      response.status,
+      errorData
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Razorpay: Verify payment after checkout
+ */
+export async function verifyPayment(
+  razorpay_order_id: string,
+  razorpay_payment_id: string,
+  razorpay_signature: string
+): Promise<{ success: boolean; message: string; plan?: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/payments/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new ApiError(
+      errorData.detail || "Payment verification failed",
+      response.status,
+      errorData
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Get Razorpay Key ID (for frontend checkout)
+ */
+export async function getRazorpayKey(): Promise<{ key_id: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/payments/key`);
+  if (!response.ok) {
+    throw new ApiError("Razorpay not configured", response.status);
+  }
+  return response.json();
+}
+
+/**
  * Check backend health
  */
 export async function checkHealth(): Promise<{

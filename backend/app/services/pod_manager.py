@@ -131,9 +131,14 @@ class PodManager:
                     return False
             
             # Check idle timeout
+            # If last_activity is None, it means pod was just started by us
+            # and we haven't had any activity yet. In this case, don't stop.
+            # However, if pod was already running when monitoring started,
+            # start_monitoring() should have initialized last_activity.
             if self.last_activity is None:
-                # No activity recorded, don't stop (might be just started)
-                logger.debug("No activity recorded yet, not stopping")
+                # This should only happen if pod was just started by ensure_running()
+                # and no jobs have been registered yet. Give it a grace period.
+                logger.debug("No activity recorded yet, not stopping (pod may have just started)")
                 return False
             
             idle_time = time.time() - self.last_activity
@@ -187,6 +192,32 @@ class PodManager:
         """Start the background monitoring task"""
         if not self.is_monitoring:
             self.is_monitoring = True
+            
+            # Initialize state if pod is already running
+            # This handles the case where pod was running before backend started
+            try:
+                if self.runpod.is_pod_running(self.pod_id):
+                    logger.info(f"Pod {self.pod_id} is already running. Initializing monitoring state...")
+                    
+                    # If no activity recorded yet, set it to allow immediate stop check
+                    # (after respecting min_uptime)
+                    if self.last_activity is None:
+                        # Set last_activity to past time so idle check can trigger
+                        # We subtract idle_timeout + 1 to ensure it's past the threshold
+                        self.last_activity = time.time() - self.idle_timeout - 1
+                        logger.info(
+                            f"Pod was already running. Set last_activity to allow idle check "
+                            f"(will stop after {self.min_uptime}s minimum uptime if no jobs)"
+                        )
+                    
+                    # If pod_start_time not set, set it to allow min_uptime check
+                    # We set it to a time in the past to respect min_uptime immediately
+                    if self.pod_start_time is None:
+                        self.pod_start_time = time.time() - self.min_uptime - 1
+                        logger.info("Set pod_start_time to allow immediate idle check")
+            except Exception as e:
+                logger.warning(f"Error checking pod status during monitoring start: {e}")
+            
             if self._monitor_task is None or self._monitor_task.done():
                 self._monitor_task = asyncio.create_task(self.monitor_loop())
                 logger.info("Pod monitoring started")

@@ -3,7 +3,7 @@ import os
 import time
 import logging
 import requests
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from enum import Enum
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -118,6 +118,7 @@ class RunPodClient:
                 machineId
                 containerDiskInGb
                 volumeInGb
+                volumeId
                 ports
             }
         }
@@ -277,4 +278,94 @@ class RunPodClient:
         if pod:
             return pod.get("costPerHr")
         return None
+    
+    def get_pod_volume(self, pod_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get volume information from a pod
+        
+        Args:
+            pod_id: Pod ID to check
+            
+        Returns:
+            Dictionary with volume information (id, sizeGb) or None if no volume
+        """
+        pod = self.get_pod(pod_id)
+        if not pod:
+            return None
+        
+        volume_id = pod.get("volumeId")
+        volume_size = pod.get("volumeInGb")
+        
+        if volume_id:
+            return {
+                "id": volume_id,
+                "sizeGb": volume_size,
+                "podId": pod_id
+            }
+        return None
+    
+    def get_volume(self, volume_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get details about a specific volume
+        
+        Args:
+            volume_id: Volume ID to query
+            
+        Returns:
+            Volume information dict or None if not found
+        """
+        query = """
+        query Volume($input: VolumeQueryInput!) {
+            volume(input: $input) {
+                id
+                name
+                sizeGb
+                type
+                podIds
+                createdAt
+            }
+        }
+        """
+        
+        variables = {"input": {"id": volume_id}}
+        
+        try:
+            data = self._execute_query(query, variables)
+            if data:
+                return data.get("volume")
+            return None
+        except RunPodError:
+            return None
+    
+    def list_volumes(self) -> List[Dict[str, Any]]:
+        """
+        List all volumes in your account
+        
+        Returns:
+            List of volume dictionaries, empty list if error or no volumes
+        """
+        query = """
+        query Volumes {
+            myself {
+                volumes {
+                    id
+                    name
+                    sizeGb
+                    type
+                    podIds
+                    createdAt
+                }
+            }
+        }
+        """
+        
+        try:
+            data = self._execute_query(query, {})
+            if data and data.get("myself"):
+                volumes = data["myself"].get("volumes", [])
+                return volumes if volumes else []
+            return []
+        except RunPodError as e:
+            logger.warning(f"Failed to list volumes: {e}")
+            return []
 

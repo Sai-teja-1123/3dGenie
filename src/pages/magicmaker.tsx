@@ -1,9 +1,8 @@
-import ModelViewer3D from "@/components/ModelViewer3D";
 import { Upload, ArrowLeft, Twitter, Instagram, Facebook, Trash, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaMale, FaFemale } from "react-icons/fa";
-import * as XLSX from "xlsx";
+// XLSX is dynamically imported when needed to reduce initial bundle size (~500KB saved)
 import {
   generate3DModel,
   generateImage,
@@ -53,11 +52,14 @@ const accessoryOptions: AccessoryOption[] = [
 
 const colorPartsOrder: ColorPart[] = ["hair", "outfit", "skin", "shoes"];
 
+// Lazy-load heavy components so their chunks only download when needed.
+const LazyModelViewer3D = lazy(() => import("@/components/ModelViewer3D"));
+const LazyDetailsModal = lazy(() => import("@/components/MagicDetailsModal"));
+const LazyCropModal = lazy(() => import("@/components/MagicCropModal"));
+
 const MagicMaker = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const cropCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const cropImgRef = useRef<HTMLImageElement | null>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [rawImageUrl, setRawImageUrl] = useState<string | null>(null);
@@ -65,13 +67,6 @@ const MagicMaker = () => {
   const [boysList, setBoysList] = useState<string[]>([]);
   const [girlsList, setGirlsList] = useState<string[]>([]);
   const [cropOpen, setCropOpen] = useState(false);
-  const [cropScale, setCropScale] = useState(1.0);
-  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
-  const cropContainerRef = useRef<HTMLDivElement | null>(null);
-  const [cropRect, setCropRect] = useState<{ x: number; y: number; size: number }>({ x: 150, y: 150, size: 300 });
-  const [minZoom, setMinZoom] = useState(0.1);
-  const [cropDragMode, setCropDragMode] = useState<null | "move" | "nw" | "ne" | "sw" | "se">(null);
-  const [dragStartPt, setDragStartPt] = useState<{ x: number; y: number } | null>(null);
   const [gender, setGender] = useState("");
   const [age, setAge] = useState("");
   const [selectedColors, setSelectedColors] = useState<Record<ColorPart, string>>({
@@ -385,6 +380,8 @@ const MagicMaker = () => {
   useEffect(() => {
     const loadPrompts = async () => {
       try {
+        // Dynamically import XLSX only when needed - saves ~500KB from initial bundle
+        const XLSX = await import("xlsx");
         const response = await fetch("/character-prompts.xlsx");
         const arrayBuffer = await response.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: "array" });
@@ -522,85 +519,14 @@ const MagicMaker = () => {
     }
   }, [model, promptsLoaded, promptsMap]);
 
-  const modelOptions: string[] = gender === "male" ? boysList : gender === "female" ? girlsList : [...boysList, ...girlsList];
+  const modelOptions: string[] = gender === "male"
+    ? boysList
+    : gender === "female"
+      ? girlsList
+      : [...new Set([...boysList, ...girlsList])].sort();
 
   const MIN_AGE = 1;
   const MAX_AGE = 16;
-
-  const renderCrop = () => {
-    const canvas = cropCanvasRef.current;
-    const img = cropImgRef.current;
-    const container = cropContainerRef.current;
-    if (!canvas || !img || !container) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    
-    // Get actual container size (use full dimensions, not just minimum)
-    const rect = container.getBoundingClientRect();
-    const containerWidth = rect.width;
-    const containerHeight = rect.height;
-    
-    if (containerWidth <= 0 || containerHeight <= 0) return; // Wait for valid size
-    
-    // Set canvas size to match container (use device pixel ratio for quality)
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = containerWidth * dpr;
-    canvas.height = containerHeight * dpr;
-    canvas.style.width = `${containerWidth}px`;
-    canvas.style.height = `${containerHeight}px`;
-    
-    // Reset transform and scale for high DPI
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(dpr, dpr);
-    
-    // Clear and fill background
-    ctx.clearRect(0, 0, containerWidth, containerHeight);
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, containerWidth, containerHeight);
-    
-    // Calculate image dimensions
-    const iw = img.naturalWidth * cropScale;
-    const ih = img.naturalHeight * cropScale;
-    
-    // Center the image with offset
-    const cx = containerWidth / 2 + cropOffset.x;
-    const cy = containerHeight / 2 + cropOffset.y;
-    const dx = cx - iw / 2;
-    const dy = cy - ih / 2;
-    
-    // Draw the image
-    ctx.drawImage(img, dx, dy, iw, ih);
-  };
-
-  useEffect(() => { 
-    if (cropOpen) {
-      // Resize canvas when container size changes
-      const resizeObserver = new ResizeObserver(() => {
-        const container = cropContainerRef.current;
-        const img = cropImgRef.current;
-        if (container && img) {
-          const rect = container.getBoundingClientRect();
-          const containerWidth = rect.width;
-          const containerHeight = rect.height;
-          if (containerWidth > 0 && containerHeight > 0) {
-            // Recalculate min zoom when container resizes
-            const scaleToFitWidth = containerWidth / img.naturalWidth;
-            const scaleToFitHeight = containerHeight / img.naturalHeight;
-            const scaleToFit = Math.min(scaleToFitWidth, scaleToFitHeight);
-            const calculatedMinZoom = scaleToFit * 0.5;
-            setMinZoom(Math.max(0.05, calculatedMinZoom));
-          }
-        }
-        renderCrop();
-      });
-      const container = cropContainerRef.current;
-      if (container) {
-        resizeObserver.observe(container);
-        renderCrop(); // Initial render
-        return () => resizeObserver.disconnect();
-      }
-    }
-  }, [cropScale, cropOffset, cropOpen]);
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white flex flex-col">
@@ -702,45 +628,8 @@ const MagicMaker = () => {
                     <button
                       className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-xl bg-black/80 hover:bg-black/90 text-white px-3 py-1.5 text-xs font-medium transition-all shadow-lg hover:scale-105 backdrop-blur-sm"
                       onClick={() => {
-                        setCropOpen(true);
                         if (rawImageUrl) {
-                          setTimeout(() => {
-                            const img = new Image();
-                            img.onload = () => {
-                              cropImgRef.current = img;
-                              const container = cropContainerRef.current;
-                              if (container) {
-                                const initCrop = () => {
-                                  const rect = container.getBoundingClientRect();
-                                  const containerWidth = rect.width;
-                                  const containerHeight = rect.height;
-                                  
-                                  if (containerWidth <= 0 || containerHeight <= 0) {
-                                    setTimeout(initCrop, 50);
-                                    return;
-                                  }
-                                  
-                                  const scaleToFitWidth = containerWidth / img.naturalWidth;
-                                  const scaleToFitHeight = containerHeight / img.naturalHeight;
-                                  const scaleToFit = Math.min(scaleToFitWidth, scaleToFitHeight);
-                                  const calculatedMinZoom = scaleToFit * 0.3;
-                                  const finalMinZoom = Math.max(0.05, calculatedMinZoom);
-                                  setMinZoom(finalMinZoom);
-                                  const initialScale = scaleToFit * 0.95;
-                                  setCropScale(initialScale);
-                                  setCropOffset({ x: 0, y: 0 });
-                                  const containerSize = Math.min(containerWidth, containerHeight);
-                                  const cropSize = containerSize * 0.6;
-                                  const cropX = (containerWidth - cropSize) / 2;
-                                  const cropY = (containerHeight - cropSize) / 2;
-                                  setCropRect({ x: cropX, y: cropY, size: cropSize });
-                                  renderCrop();
-                                };
-                                initCrop();
-                              }
-                            };
-                            img.src = rawImageUrl;
-                          }, 100);
+                          setCropOpen(true);
                         }
                       }}
                       title="Crop photo"
@@ -762,43 +651,6 @@ const MagicMaker = () => {
                       if (rawImageUrl) URL.revokeObjectURL(rawImageUrl);
                       setRawImageUrl(url);
                       setCropOpen(true);
-                      setTimeout(() => {
-                        const img = new Image();
-                        img.onload = () => {
-                          cropImgRef.current = img;
-                          const container = cropContainerRef.current;
-                          if (container) {
-                            const initCrop = () => {
-                              const rect = container.getBoundingClientRect();
-                              const containerWidth = rect.width;
-                              const containerHeight = rect.height;
-                              
-                              if (containerWidth <= 0 || containerHeight <= 0) {
-                                setTimeout(initCrop, 50);
-                                return;
-                              }
-                              
-                              const scaleToFitWidth = containerWidth / img.naturalWidth;
-                              const scaleToFitHeight = containerHeight / img.naturalHeight;
-                              const scaleToFit = Math.min(scaleToFitWidth, scaleToFitHeight);
-                              const calculatedMinZoom = scaleToFit * 0.3;
-                              const finalMinZoom = Math.max(0.05, calculatedMinZoom);
-                              setMinZoom(finalMinZoom);
-                              const initialScale = scaleToFit * 0.95;
-                              setCropScale(initialScale);
-                              setCropOffset({ x: 0, y: 0 });
-                              const containerSize = Math.min(containerWidth, containerHeight);
-                              const cropSize = containerSize * 0.6;
-                              const cropX = (containerWidth - cropSize) / 2;
-                              const cropY = (containerHeight - cropSize) / 2;
-                              setCropRect({ x: cropX, y: cropY, size: cropSize });
-                              renderCrop();
-                            };
-                            initCrop();
-                          }
-                        };
-                        img.src = url;
-                      }, 100);
                     }
                   }}
                 />
@@ -895,155 +747,27 @@ const MagicMaker = () => {
           </div>
 
 
-          {/* Crop Modal */}
-          {cropOpen && (
-            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-              <div className="w-full max-w-4xl max-h-[90vh] bg-[#0b1222]/95 backdrop-blur-xl text-white rounded-3xl border border-white/10 p-6 sm:p-8 select-none flex flex-col shadow-2xl shadow-black/50 overflow-y-auto">
-                <div className="flex items-center justify-between mb-6 flex-shrink-0">
-                  <div>
-                    <h3 className="text-xl font-extrabold tracking-wide" style={{ textShadow: '0 2px 6px rgba(0, 0, 0, 0.3)' }}>Crop to Select Face</h3>
-                    <p className="text-sm text-white/60 mt-1">Adjust the crop area to focus on the face</p>
-                  </div>
-                  <button className="text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/10 p-2" onClick={() => setCropOpen(false)}>Close</button>
+          {/* Crop Modal (lazy-loaded) */}
+          {cropOpen && rawImageUrl && (
+            <Suspense
+              fallback={
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center">
+                  <div className="text-white/80 text-sm">Loading crop tool...</div>
                 </div>
-                <div
-                  ref={cropContainerRef}
-                  className="relative w-full flex-1 min-h-0 rounded-2xl overflow-hidden bg-black/70 border border-white/10 select-none shadow-2xl ring-1 ring-white/5"
-                  style={{ minHeight: '400px', maxHeight: 'calc(90vh - 200px)', aspectRatio: '4 / 3' }}
-                  onMouseDown={(e) => {
-                    const rect = cropContainerRef.current?.getBoundingClientRect();
-                    if (!rect) return;
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    const h = 14;
-                    const within = (rx: number, ry: number) => x >= rx && x <= rx + h && y >= ry && y <= ry + h;
-                    if (within(cropRect.x - h/2, cropRect.y - h/2)) { setCropDragMode("nw"); }
-                    else if (within(cropRect.x + cropRect.size - h/2, cropRect.y - h/2)) { setCropDragMode("ne"); }
-                    else if (within(cropRect.x - h/2, cropRect.y + cropRect.size - h/2)) { setCropDragMode("sw"); }
-                    else if (within(cropRect.x + cropRect.size - h/2, cropRect.y + cropRect.size - h/2)) { setCropDragMode("se"); }
-                    else if (x >= cropRect.x && x <= cropRect.x + cropRect.size && y >= cropRect.y && y <= cropRect.y + cropRect.size) {
-                      setCropDragMode("move");
-                    } else {
-                      setCropDragMode(null);
-                    }
-                    setDragStartPt({ x, y });
-                  }}
-                  onMouseMove={(e) => {
-                    if (!cropDragMode || !dragStartPt) return;
-                    const rect = cropContainerRef.current?.getBoundingClientRect();
-                    if (!rect) return;
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    const dx = x - dragStartPt.x;
-                    const dy = y - dragStartPt.y;
-                    setDragStartPt({ x, y });
-                    setCropRect((prev) => {
-                      let { x: px, y: py, size } = prev;
-                      const maxWidth = rect.width;
-                      const maxHeight = rect.height;
-                      const maxSize = Math.min(maxWidth, maxHeight);
-                      
-                      if (cropDragMode === "move") {
-                        px = Math.max(0, Math.min(maxWidth - size, px + dx));
-                        py = Math.max(0, Math.min(maxHeight - size, py + dy));
-                        return { x: px, y: py, size };
-                      }
-                      // Resize keeping square
-                      if (cropDragMode === "nw") {
-                        px += dx; py += dy; size -= Math.max(dx, dy);
-                      } else if (cropDragMode === "ne") {
-                        py += dy; size -= Math.max(-dx, dy);
-                      } else if (cropDragMode === "sw") {
-                        px += dx; size -= Math.max(dx, -dy);
-                      } else if (cropDragMode === "se") {
-                        size += Math.max(dx, dy);
-                      }
-                      size = Math.max(50, Math.min(maxSize, size));
-                      px = Math.max(0, Math.min(maxWidth - size, px));
-                      py = Math.max(0, Math.min(maxHeight - size, py));
-                      return { x: px, y: py, size };
-                    });
-                  }}
-                  onMouseUp={() => { setCropDragMode(null); setDragStartPt(null); }}
-                  onMouseLeave={() => { setCropDragMode(null); setDragStartPt(null); }}
-                >
-                  {/* base image canvas (for accurate transform) */}
-                  <canvas ref={cropCanvasRef} className="absolute inset-0 w-full h-full" />
-                  {/* crop overlay */}
-                  <div className="absolute inset-0 bg-black/40" />
-                  <div
-                    className="absolute border-2 border-yellow-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"
-                    style={{ left: cropRect.x, top: cropRect.y, width: cropRect.size, height: cropRect.size }}
-                  >
-                    {/* handles */}
-                    {(["nw","ne","sw","se"] as const).map((pos) => {
-                      const half = 7;
-                      const style: React.CSSProperties = {
-                        width: 14, height: 14, background: "#fde047", borderRadius: 3, position: "absolute",
-                        left: pos.includes("e") ? cropRect.size - half : -half,
-                        top: pos.includes("s") ? cropRect.size - half : -half,
-                        cursor: `${pos}-resize` as any,
-                      };
-                      return <div key={pos} style={style} />;
-                    })}
-                  </div>
-                </div>
-                <div className="mt-4 flex items-center gap-3 flex-shrink-0">
-                  <span className="text-xs text-white/60">Zoom</span>
-                  <input
-                    type="range"
-                    min={minZoom}
-                    max={3}
-                    step={0.02}
-                    value={cropScale}
-                    onChange={(e) => setCropScale(parseFloat(e.target.value))}
-                    className="w-full"
-                  />
-                </div>
-                <div className="mt-6 flex justify-end gap-3 flex-shrink-0">
-                  <button className="bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded-xl px-6 py-3 font-medium transition-all hover:scale-105 hover:shadow-lg backdrop-blur-sm" onClick={() => setCropOpen(false)}>Cancel</button>
-                  <button
-                    className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold rounded-xl px-8 py-3 transition-all hover:scale-105 hover:shadow-xl hover:shadow-yellow-400/30"
-                    onClick={() => {
-                      const viewCanvas = cropCanvasRef.current;
-                      const img = cropImgRef.current;
-                      const container = cropContainerRef.current;
-                      if (!viewCanvas || !img || !container) return;
-                      
-                      const rect = container.getBoundingClientRect();
-                      const containerWidth = rect.width;
-                      const containerHeight = rect.height;
-                      
-                      const exportCanvas = document.createElement("canvas");
-                      exportCanvas.width = 600; exportCanvas.height = 600;
-                      const ctx = exportCanvas.getContext("2d");
-                      if (!ctx) return;
-                      
-                      const iw = img.naturalWidth * cropScale;
-                      const ih = img.naturalHeight * cropScale;
-                      const cx = containerWidth / 2 + cropOffset.x;
-                      const cy = containerHeight / 2 + cropOffset.y;
-                      const dx = cx - iw / 2;
-                      const dy = cy - ih / 2;
-                      const scaleExport = 600 / cropRect.size;
-                      ctx.setTransform(scaleExport, 0, 0, scaleExport, -cropRect.x * scaleExport, -cropRect.y * scaleExport);
-                      ctx.drawImage(img, dx, dy, iw, ih);
-                      exportCanvas.toBlob((blob) => {
-                        if (!blob) return;
-                        const url = URL.createObjectURL(blob);
-                        if (previewUrl) URL.revokeObjectURL(previewUrl);
-                        setPreviewUrl(url);
-                        setCropOpen(false);
-                        // Open details modal after crop
-                        setShowDetailsModal(true);
-                      }, "image/jpeg", 0.92);
-                    }}
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            </div>
+              }
+            >
+              <LazyCropModal
+                open={cropOpen}
+                imageUrl={rawImageUrl}
+                onClose={() => setCropOpen(false)}
+                onCropped={(url) => {
+                  if (previewUrl) URL.revokeObjectURL(previewUrl);
+                  setPreviewUrl(url);
+                  setCropOpen(false);
+                  setShowDetailsModal(true);
+                }}
+              />
+            </Suspense>
           )}
 
           {/* Action Buttons */}
@@ -1115,7 +839,15 @@ const MagicMaker = () => {
                 <div className="flex flex-col items-center gap-8">
                   <div className="w-full max-w-4xl">
                     <div className="aspect-[16/9] max-h-[450px] rounded-2xl overflow-hidden bg-black/60 shadow-2xl ring-1 ring-white/10">
-                      <ModelViewer3D modelUrl={resultModelUrl} />
+                      <Suspense
+                        fallback={
+                          <div className="w-full h-full flex items-center justify-center text-white/70 text-sm">
+                            Loading 3D viewer...
+                          </div>
+                        }
+                      >
+                        <LazyModelViewer3D modelUrl={resultModelUrl} />
+                      </Suspense>
                     </div>
                   </div>
                   {resultFiles.length > 0 && (
@@ -1185,178 +917,44 @@ const MagicMaker = () => {
         </div>
       </main>
 
-      {/* Details Modal (Gender/Age/Model) */}
+      {/* Details Modal (Gender/Age/Model) - lazy-loaded */}
       {showDetailsModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-[#0b1222]/95 backdrop-blur-xl text-white rounded-3xl border border-white/10 p-8 shadow-2xl shadow-black/50">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-2xl font-bold tracking-tight">Select Character Details</h3>
-              <button className="text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/10 p-2" onClick={() => setShowDetailsModal(false)}>Close</button>
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center">
+              <div className="text-white/80 text-sm">Loading details...</div>
             </div>
-            
-            <div className="space-y-6">
-              {/* Gender Selection */}
-              <div>
-                <label className="block text-sm font-medium text-white/90 mb-3">Select Gender</label>
-                <div className="flex gap-4">
-                  <button
-                    className={`flex-1 flex flex-col items-center justify-center px-4 py-5 rounded-2xl border-2 transition-all backdrop-blur-sm ${
-                      gender === 'male' 
-                        ? 'bg-yellow-400/20 border-yellow-400 text-yellow-300 scale-105 shadow-lg shadow-yellow-400/20' 
-                        : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:scale-105 hover:shadow-lg'
-                    }`}
-                    onClick={() => {
-                      setGender('male');
-                      setModel(null);
-                      setShowPreview(false);
-                    }}
-                    type="button"
-                  >
-                    <FaMale className="text-3xl mb-2" />
-                    <span className="text-sm font-medium">Boy</span>
-                  </button>
-                  <button
-                    className={`flex-1 flex flex-col items-center justify-center px-4 py-5 rounded-2xl border-2 transition-all backdrop-blur-sm ${
-                      gender === 'female' 
-                        ? 'bg-pink-400/20 border-pink-400 text-pink-300 scale-105 shadow-lg shadow-pink-400/20' 
-                        : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:scale-105 hover:shadow-lg'
-                    }`}
-                    onClick={() => {
-                      setGender('female');
-                      setModel(null);
-                      setShowPreview(false);
-                    }}
-                    type="button"
-                  >
-                    <FaFemale className="text-3xl mb-2" />
-                    <span className="text-sm font-medium">Girl</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Age Selection */}
-              <div>
-                <label className="block text-sm font-medium text-white/90 mb-2">Age (years)</label>
-                <input
-                  type="number"
-                  value={age}
-                  onChange={e => {
-                    let val = parseInt(e.target.value.replace(/[^\d]/g, ""), 10);
-                    if (isNaN(val)) val = "";
-                    if (val !== "" && val < MIN_AGE) val = MIN_AGE;
-                    if (val > MAX_AGE) val = MAX_AGE;
-                    setAge(val === "" ? "" : String(val));
-                  }}
-                  min={MIN_AGE}
-                  max={MAX_AGE}
-                  className="w-full border border-white/20 bg-white/5 backdrop-blur-sm text-white rounded-xl px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all shadow-inner"
-                  placeholder={`Enter age (${MIN_AGE}-${MAX_AGE})`}
-                  maxLength={2}
-                  inputMode="numeric"
-                />
-                <div className="text-xs text-white/50 mt-1">Ages {MIN_AGE} to {MAX_AGE} only</div>
-              </div>
-
-              {/* Model Selection */}
-              <div>
-                <label className="block text-sm font-medium text-white/90 mb-2">Choose Character</label>
-                <select
-                  value={model || ""}
-                  onChange={(e) => {
-                    const selectedName = e.target.value;
-                    if (selectedName) {
-                      setModel(selectedName);
-                      setShowPreview(false);
-                      if (promptsLoaded) {
-                        const normalizeName = (name: string): string => {
-                          return name
-                            .toLowerCase()
-                            .replace(/\s*-\s*/g, " ")
-                            .replace(/\s+/g, " ")
-                            .trim();
-                        };
-                        
-                        let prompt = promptsMap.get(selectedName.toLowerCase());
-                        
-                        if (!prompt) {
-                          const normalized = normalizeName(selectedName);
-                          prompt = promptsMap.get(normalized);
-                        }
-                        
-                        const nameVariations: Record<string, string[]> = {
-                          "elsa": ["elsa", "elsa - frozen"],
-                          "anna": ["anna", "anna- frozen"],
-                          "ariel": ["ariel", "little mermaid"],
-                          "belle": ["belle", "belle - beauty and the beast"],
-                        };
-                        
-                        if (!prompt) {
-                          const lowerName = selectedName.toLowerCase();
-                          for (const [base, variations] of Object.entries(nameVariations)) {
-                            if (variations.includes(lowerName) || lowerName === base) {
-                              for (const variation of variations) {
-                                prompt = promptsMap.get(variation);
-                                if (prompt) break;
-                              }
-                              if (prompt) break;
-                            }
-                          }
-                        }
-                        
-                        if (prompt) {
-                          setCustomNotes(prompt);
-                        } else {
-                          const defaultPrompt = `Create a 3D character model inspired by ${selectedName}. Make it vibrant, playful, and suitable for children.`;
-                          setCustomNotes(defaultPrompt);
-                        }
-                      }
-                    } else {
-                      setModel(null);
-                      setShowPreview(false);
-                    }
-                  }}
-                  disabled={!gender || !promptsLoaded}
-                  className="w-full border border-white/20 bg-white/5 backdrop-blur-sm text-white rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-inner"
-                >
-                  <option value="">{!gender ? "Select gender first" : !promptsLoaded ? "Loading characters..." : "Choose a character"}</option>
-                  {modelOptions.map((characterName) => (
-                    <option key={characterName} value={characterName} className="bg-[#0f172a] text-white">
-                      {characterName}
-                    </option>
-                  ))}
-                </select>
-                {!gender && (
-                  <div className="text-xs text-white/50 mt-2">Please select gender first</div>
-                )}
-              </div>
-
-              {/* Done Button */}
-              <div className="flex justify-end gap-3 pt-6">
-                <button
-                  className="bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded-xl px-6 py-3 font-medium transition-all hover:scale-105 hover:shadow-lg backdrop-blur-sm"
-                  onClick={() => setShowDetailsModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold rounded-xl px-8 py-3 transition-all hover:scale-105 hover:shadow-xl hover:shadow-yellow-400/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  onClick={() => {
-                    if (gender && age && model) {
-                      setShowDetailsModal(false);
-                      // Auto-generate preview
-                      if (readyForPreview) {
-                        startPreviewGeneration();
-                      }
-                    }
-                  }}
-                  disabled={!gender || !age || !model}
-                >
-                  Done
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+          }
+        >
+          <LazyDetailsModal
+            open={showDetailsModal}
+            gender={gender}
+            age={age}
+            model={model}
+            modelOptions={modelOptions}
+            minAge={MIN_AGE}
+            maxAge={MAX_AGE}
+            onClose={() => setShowDetailsModal(false)}
+            onGenderChange={(g) => {
+              setGender(g);
+              setModel(null);
+              setShowPreview(false);
+            }}
+            onAgeChange={(val) => setAge(val)}
+            onModelChange={(selectedName) => {
+              setModel(selectedName);
+              setShowPreview(false);
+            }}
+            onDone={() => {
+              if (gender && age && model) {
+                setShowDetailsModal(false);
+                if (readyForPreview) {
+                  startPreviewGeneration();
+                }
+              }
+            }}
+          />
+        </Suspense>
       )}
 
 

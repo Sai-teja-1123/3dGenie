@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, memo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as THREE from "three";
 
 const AutoRotate = memo(({ children }: { children: React.ReactNode }) => {
@@ -16,20 +16,17 @@ AutoRotate.displayName = 'AutoRotate';
 const CharacterModel = memo(() => {
   const [object3d, setObject3d] = useState<THREE.Group | null>(null);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef<THREE.Group | null>(null);
 
   useEffect(() => {
     let isMounted = true;
-    const loadedTextures: THREE.Texture[] = [];
-    const loadedMaterials: THREE.Material[] = [];
-    
-    const textureLoader = new THREE.TextureLoader();
-    const loader = new OBJLoader();
+    const loader = new GLTFLoader();
     
     loader.load(
-      "/tripo_convert_116fd530-8f07-4d68-8c46-278b55d2d11f.obj",
-      (object) => {
+      "/Hero3d.glb",
+      (gltf) => {
         if (!isMounted) {
-          object.traverse((child: THREE.Object3D) => {
+          gltf.scene.traverse((child: THREE.Object3D) => {
             if (child instanceof THREE.Mesh) {
               child.geometry.dispose();
               if (Array.isArray(child.material)) {
@@ -41,45 +38,28 @@ const CharacterModel = memo(() => {
           });
           return;
         }
-
-        textureLoader.load(
-          "/tripo_image_116fd530-8f07-4d68-8c46-278b55d2d11f_0.jpg",
-          (texture) => {
-            if (!isMounted) {
-              texture.dispose();
-              return;
-            }
-            
-            loadedTextures.push(texture);
-            
-            object.traverse((child: THREE.Object3D) => {
-              if (child instanceof THREE.Mesh) {
-                const material = new THREE.MeshStandardMaterial({ 
-                  map: texture,
-                  roughness: 0.6,
-                  metalness: 0.0
-                });
-                loadedMaterials.push(material);
-                child.material = material;
+        const object = gltf.scene;
+        loadedRef.current = object;
+        // Override GLB materials to match OBJ white lighting (remove orange glow)
+        object.traverse((child: THREE.Object3D) => {
+          if (child instanceof THREE.Mesh && child.material) {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach((mat) => {
+              if (mat instanceof THREE.MeshStandardMaterial || mat instanceof THREE.MeshPhysicalMaterial) {
+                mat.emissive = new THREE.Color(0x000000);
+                mat.emissiveIntensity = 0;
+                mat.roughness = 0.6;
+                mat.metalness = 0.0;
               }
             });
-            
-            object.scale.setScalar(2.2);
-            object.position.set(0, 0.05, 0);
-            
-            if (isMounted) {
-              setObject3d(object);
-              setLoading(false);
-            }
-          },
-          undefined,
-          (error) => {
-            console.error('Error loading texture:', error);
-            if (isMounted) {
-              setLoading(false);
-            }
           }
-        );
+        });
+        object.scale.setScalar(2.2);
+        object.position.set(0, 0.05, 0);
+        if (isMounted) {
+          setObject3d(object);
+          setLoading(false);
+        }
       },
       undefined,
       (error) => {
@@ -92,20 +72,9 @@ const CharacterModel = memo(() => {
 
     return () => {
       isMounted = false;
-      
-      // Dispose all loaded textures
-      loadedTextures.forEach(texture => {
-        texture.dispose();
-      });
-      
-      // Dispose all loaded materials
-      loadedMaterials.forEach(material => {
-        material.dispose();
-      });
-      
-      // Dispose model if it exists
-      if (object3d) {
-        object3d.traverse((child: THREE.Object3D) => {
+      const obj = loadedRef.current;
+      if (obj) {
+        obj.traverse((child: THREE.Object3D) => {
           if (child instanceof THREE.Mesh) {
             child.geometry.dispose();
             if (Array.isArray(child.material)) {
@@ -115,6 +84,7 @@ const CharacterModel = memo(() => {
             }
           }
         });
+        loadedRef.current = null;
       }
     };
   }, []);
