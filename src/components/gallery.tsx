@@ -1,14 +1,14 @@
 import { memo, useState } from "react";
+import knightImg from "../gallery 3d models/character-knight.jpg";
+import superheroImg from "../gallery 3d models/character-superhero.jpg";
+import fairyImg from "../gallery 3d models/character-fairy.jpg";
+import astronautImg from "../gallery 3d models/character-astronaut.jpg";
 
 const galleryImages = [
-  { id: 1, src: "/src/gallery 3d models/character-knight.png", title: "Knight" },
-  { id: 2, src: "/src/gallery 3d models/character-superhero.png", title: "Superhero" },
-  { id: 3, src: "/src/gallery 3d models/character-fairy.png", title: "Fairy" },
-  { id: 4, src: "/src/gallery 3d models/character-astronaut.png", title: "Astronaut" },
-  { id: 7, src: "/src/gallery 3d models/moana_blue.jpeg", title: "Moana" },
-  { id: 5, src: "/src/gallery 3d models/one_piece_blue.jpeg", title: "One Piece" },
-  { id: 6, src: "/src/gallery 3d models/bossbaby-blue.jpeg", title: "Boss Baby" },
-  { id: 8, src: "/src/gallery 3d models/snowwhite_blue.jpeg", title: "Snow White" },
+  { id: 1, src: knightImg, title: "Knight" },
+  { id: 2, src: superheroImg, title: "Superhero" },
+  { id: 3, src: fairyImg, title: "Fairy" },
+  { id: 4, src: astronautImg, title: "Astronaut" },
 ];
 
 const Gallery = memo(() => {
