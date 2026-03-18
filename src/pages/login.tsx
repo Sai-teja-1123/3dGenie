@@ -42,19 +42,20 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex items-center justify-center px-6 py-12 overflow-hidden relative">
-      <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/10" />
-      <div className="absolute inset-0 bg-gradient-hero opacity-60" />
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-accent/30 rounded-full blur-3xl animate-pulse delay-1000" />
-      <div className="absolute top-1/2 right-1/3 w-64 h-64 bg-secondary/25 rounded-full blur-2xl animate-pulse delay-500" />
+    <div className="min-h-screen bg-dark-bg text-white flex items-center justify-center px-6 py-12 overflow-hidden relative font-sans">
+      <div className="absolute inset-0 bg-black" />
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-24 left-1/4 w-[28rem] h-[28rem] bg-[#00f2ff]/20 rounded-full blur-[140px]" />
+        <div className="absolute bottom-[-8rem] right-1/4 w-[26rem] h-[26rem] bg-[#7000ff]/25 rounded-full blur-[140px]" />
+        <div className="absolute top-1/2 right-1/3 w-72 h-72 bg-[#ff8a00]/10 rounded-full blur-[120px]" />
+      </div>
 
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <h1
-          className="text-9xl md:text-[12rem] lg:text-[16rem] font-bold text-primary/10 select-none"
+          className="text-8xl md:text-[11rem] lg:text-[14rem] font-bold text-white/5 select-none uppercase tracking-tight"
           style={{
             animation: "flowing 8s ease-in-out infinite, gradientShift 4s ease-in-out infinite",
-            background: "linear-gradient(45deg, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary)))",
+            background: "linear-gradient(45deg, #00f2ff, #7000ff, #ff8a00)",
             backgroundClip: "text",
             WebkitBackgroundClip: "text",
             color: "transparent",
@@ -81,29 +82,36 @@ const LoginPage = () => {
       </style>
 
       <div className="relative z-10 w-full max-w-md">
-        <div className="bg-card/80 backdrop-blur-sm border border-border rounded-2xl shadow-2xl p-8">
+        <div className="glass border border-white/10 rounded-3xl shadow-[0_0_40px_rgba(112,0,255,0.22)] p-8">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold mb-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 mb-4">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00f2ff] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00f2ff]" />
+              </span>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/60">Secure Access</span>
+            </div>
+            <h1 className="text-4xl font-bold mb-2 tracking-tight">
               {isSignUp ? "Sign Up for" : "Sign In to"}
-              <span className="block text-primary bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              <span className="block bg-gradient-to-r from-[#00f2ff] via-white to-[#7000ff] bg-clip-text text-transparent">
                 3DGENI
               </span>
             </h1>
-            <p className="text-muted-foreground">Bring your ideas to life with AI</p>
+            <p className="text-white/50">Bring your ideas to life with AI</p>
           </div>
 
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-3">
               <Button
                 onClick={onGoogle}
-                className="bg-white text-foreground hover:bg-white/90 border border-border rounded-lg py-3 font-medium text-sm"
+                className="glass hover:bg-white/10 border border-white/15 rounded-xl py-3 font-semibold text-[11px] uppercase tracking-widest text-white"
                 type="button"
               >
                 Google
               </Button>
               <Button
                 onClick={onFacebook}
-                className="bg-blue-600 text-white hover:bg-blue-700 border border-blue-600 rounded-lg py-3 font-medium text-sm"
+                className="glass hover:bg-white/10 border border-white/15 rounded-xl py-3 font-semibold text-[11px] uppercase tracking-widest text-white"
                 type="button"
               >
                 Facebook
@@ -112,16 +120,16 @@ const LoginPage = () => {
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
+                <span className="w-full border-t border-white/10" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                <span className="bg-[#0a0a0f] px-2 text-white/40 tracking-widest text-[10px]">Or continue with</span>
               </div>
             </div>
 
             <form onSubmit={onEmailPasswordSubmit} className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium mb-2">
+                <label htmlFor="email" className="block text-[11px] uppercase tracking-widest font-bold text-white/70 mb-2">
                   Email
                 </label>
                 <input
@@ -130,12 +138,12 @@ const LoginPage = () => {
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg bg-input border border-border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-xl bg-white/5 border border-white/15 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-[#00f2ff]/40 focus:border-[#00f2ff]/40"
                   required
                 />
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-medium mb-2">
+                <label htmlFor="password" className="block text-[11px] uppercase tracking-widest font-bold text-white/70 mb-2">
                   Password
                 </label>
                 <input
@@ -144,13 +152,13 @@ const LoginPage = () => {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-lg bg-input border border-border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-xl bg-white/5 border border-white/15 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-[#7000ff]/40 focus:border-[#7000ff]/40"
                   required
                 />
               </div>
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground rounded-full py-3 font-medium"
+                className="w-full bg-gradient-action hover:opacity-95 text-white rounded-full py-3 text-[11px] uppercase tracking-widest font-bold shadow-[0_0_20px_rgba(112,0,255,0.35)]"
               >
                 {isSignUp ? "Sign Up" : "Sign In"}
               </Button>
@@ -159,7 +167,7 @@ const LoginPage = () => {
             <div className="text-center">
               <button
                 onClick={() => setIsSignUp(!isSignUp)}
-                className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                className="text-sm text-white/50 hover:text-[#00f2ff] transition-colors"
               >
                 {isSignUp ? "Already have an account? Sign In" : "New user? Sign Up"}
               </button>

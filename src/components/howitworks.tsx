@@ -56,7 +56,7 @@ function StepCard({
   }, []);
 
   const base =
-    "relative bg-card border border-border rounded-2xl p-8 transition-all duration-[1200ms] ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform";
+    "relative glass rounded-2xl p-8 transition-all duration-[1200ms] ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform";
   const hiddenCommon = "opacity-0 scale-95";
   const shownCommon = "opacity-100 scale-100 hover:border-primary/50";
   const dir = index === 0 ? "-translate-x-24" : index === 2 ? "translate-x-24" : "translate-y-16";
@@ -67,7 +67,7 @@ function StepCard({
 
   return (
     <div ref={ref} className={cls} style={{ transitionDelay: `${index * 150}ms` }}>
-      <div className="absolute top-8 left-8 text-6xl font-bold text-primary/10">{step.number}</div>
+      <div className="absolute top-8 left-8 text-6xl font-bold text-white/5">{step.number}</div>
       <div className="relative z-10 space-y-4">
         {step.imageSrc ? (
           <div className="w-full rounded-xl overflow-hidden">
@@ -84,8 +84,8 @@ function StepCard({
             <Icon className="w-8 h-8 text-primary" />
           </div>
         )}
-        <h3 className="text-2xl font-bold">{step.title}</h3>
-        <p className="text-muted-foreground leading-relaxed">{step.description}</p>
+        <h3 className="text-2xl font-bold text-white">{step.title}</h3>
+        <p className="text-white/50 leading-relaxed">{step.description}</p>
       </div>
     </div>
   );
@@ -93,11 +93,13 @@ function StepCard({
 
 const HowItWorks = () => {
   return (
-    <section className="py-20 relative">
-      <div className="container mx-auto px-6">
+    <section className="py-32 px-6 relative border-y border-white/5 bg-white/[0.02]">
+      <div className="container mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl lg:text-5xl font-bold mb-4">How Does It Work</h2>
-          <p className="text-muted-foreground text-lg">
+          <h2 className="text-5xl md:text-6xl font-bold uppercase tracking-tight mb-4">
+            How Does It Work
+          </h2>
+          <p className="text-white/40 text-lg max-w-xl mx-auto">
             Mi turpis turpis in justo pellentesque id nibh praesent.
           </p>
         </div>

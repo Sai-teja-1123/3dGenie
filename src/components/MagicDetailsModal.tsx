@@ -33,10 +33,13 @@ const MagicDetailsModal = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-[#0b1222]/95 backdrop-blur-xl text-white rounded-3xl border border-white/10 p-8 shadow-2xl shadow-black/50">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl glass text-white rounded-3xl border border-white/10 p-8 shadow-[0_0_40px_rgba(112,0,255,0.2)]">
         <div className="flex items-center justify-between mb-8">
-          <h3 className="text-2xl font-bold tracking-tight">Select Character Details</h3>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-white/45 font-bold mb-1">Character Setup</p>
+            <h3 className="text-2xl font-bold tracking-tight">Select Character Details</h3>
+          </div>
           <button
             className="text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/10 p-2"
             onClick={onClose}
@@ -53,8 +56,8 @@ const MagicDetailsModal = ({
               <button
                 className={`flex-1 flex flex-col items-center justify-center px-4 py-5 rounded-2xl border-2 transition-all backdrop-blur-sm ${
                   gender === "male"
-                    ? "bg-yellow-400/20 border-yellow-400 text-yellow-300 scale-105 shadow-lg shadow-yellow-400/20"
-                    : "bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:scale-105 hover:shadow-lg"
+                    ? "bg-[#00f2ff]/15 border-[#00f2ff] text-[#00f2ff] scale-105 shadow-[0_0_20px_rgba(0,242,255,0.25)]"
+                    : "bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:scale-105"
                 }`}
                 onClick={() => onGenderChange("male")}
                 type="button"
@@ -65,8 +68,8 @@ const MagicDetailsModal = ({
               <button
                 className={`flex-1 flex flex-col items-center justify-center px-4 py-5 rounded-2xl border-2 transition-all backdrop-blur-sm ${
                   gender === "female"
-                    ? "bg-pink-400/20 border-pink-400 text-pink-300 scale-105 shadow-lg shadow-pink-400/20"
-                    : "bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:scale-105 hover:shadow-lg"
+                    ? "bg-[#7000ff]/20 border-[#7000ff] text-[#c6a0ff] scale-105 shadow-[0_0_20px_rgba(112,0,255,0.3)]"
+                    : "bg-white/5 border-white/20 text-white/60 hover:bg-white/10 hover:scale-105"
                 }`}
                 onClick={() => onGenderChange("female")}
                 type="button"
@@ -95,7 +98,7 @@ const MagicDetailsModal = ({
               }}
               min={minAge}
               max={maxAge}
-              className="w-full border border-white/20 bg-white/5 backdrop-blur-sm text-white rounded-xl px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all shadow-inner"
+              className="w-full border border-white/20 bg-white/5 backdrop-blur-sm text-white rounded-xl px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-[#00f2ff]/45 focus:border-[#00f2ff]/50 transition-all shadow-inner"
               placeholder={`Enter age (${minAge}-${maxAge})`}
               maxLength={2}
               inputMode="numeric"
@@ -115,11 +118,11 @@ const MagicDetailsModal = ({
                 onModelChange(selectedName || null);
               }}
               disabled={!gender}
-              className="w-full border border-white/20 bg-white/5 backdrop-blur-sm text-white rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-inner"
+              className="w-full border border-white/20 bg-white/5 backdrop-blur-sm text-white rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#7000ff]/45 focus:border-[#7000ff]/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-inner"
             >
               <option value="">{!gender ? "Select gender first" : "Choose a character"}</option>
               {modelOptions.map((characterName) => (
-                <option key={characterName} value={characterName} className="bg-[#0f172a] text-white">
+                <option key={characterName} value={characterName} className="bg-[#09090f] text-white">
                   {characterName}
                 </option>
               ))}
@@ -130,17 +133,18 @@ const MagicDetailsModal = ({
           {/* Done Button */}
           <div className="flex justify-end gap-3 pt-6">
             <button
-              className="bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded-xl px-6 py-3 font-medium transition-all hover:scale-105 hover:shadow-lg backdrop-blur-sm"
+              className="glass hover:bg-white/10 text-white border border-white/10 rounded-xl px-6 py-3 text-[11px] uppercase tracking-widest font-bold transition-all hover:scale-105 backdrop-blur-sm"
               onClick={onClose}
             >
               Cancel
             </button>
             <button
-              className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold rounded-xl px-8 py-3 transition-all hover:scale-105 hover:shadow-xl hover:shadow-yellow-400/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="relative group bg-gradient-action text-white font-bold rounded-xl px-8 py-3 text-[11px] uppercase tracking-widest transition-all hover:opacity-95 hover:scale-105 shadow-[0_0_20px_rgba(112,0,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 overflow-hidden"
               onClick={onDone}
               disabled={!gender || !age || !model}
             >
-              Done
+              <div className="absolute inset-0 shimmer opacity-0 group-hover:opacity-100 transition-opacity" />
+              <span className="relative">Done</span>
             </button>
           </div>
         </div>

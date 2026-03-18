@@ -3,6 +3,8 @@ import PricingCard from "@/components/PricingCard";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { createPaymentOrder, verifyPayment } from "@/services/api";
+import { ArrowLeft, ChevronsRight, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 
 declare global {
   interface Window {
@@ -229,7 +231,7 @@ const PricingPage = () => {
   const isFreePlan = selectedPlan?.price === 0;
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-white relative">
+    <div className="min-h-screen bg-black text-white relative overflow-hidden">
       <Navbar />
 
       {/* Login Hint Notification */}
@@ -279,8 +281,47 @@ const PricingPage = () => {
         </div>
       )}
 
-      <main className="container mx-auto px-6 pt-28 pb-16">
-        <h1 className="text-center text-3xl sm:text-4xl font-extrabold mb-10">Choose the plan that's right for you</h1>
+      <main className="pt-32 pb-24 px-6 relative">
+        {/* Background Gradients similar to reference pricing */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[800px] opacity-10 pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-purple-600 rounded-full blur-[120px]" />
+          <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-cyan-400 rounded-full blur-[100px]" />
+        </div>
+
+        <div className="container mx-auto max-w-6xl relative space-y-10">
+          {/* Top bar with back + CTA, like reference but using shared navbar */}
+          <div className="flex items-center justify-between gap-4">
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/40 hover:text-white transition-colors"
+              onClick={() => navigate("/")}
+            >
+              <ArrowLeft className="w-3 h-3" />
+              Back Home
+            </button>
+            <Link
+              to="/magic-maker"
+              className="relative group px-6 py-2.5 rounded-full bg-gradient-to-r from-purple-600 to-pink-500 text-white text-[10px] uppercase tracking-widest font-bold hover:scale-105 transition-all shadow-[0_0_20px_rgba(112,0,255,0.3)] overflow-hidden"
+            >
+              <div className="absolute inset-0 shimmer opacity-0 group-hover:opacity-100 transition-opacity" />
+              <span className="relative flex items-center gap-1">
+                Get Started
+                <ChevronsRight className="w-3 h-3" />
+              </span>
+            </Link>
+          </div>
+
+        <div className="text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5">
+            <Sparkles className="w-3 h-3 text-cyan-300" />
+            <span className="text-[10px] uppercase tracking-[0.2em] text-white/60">Transparent Pricing</span>
+          </div>
+          <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tighter uppercase leading-[0.85]">
+            Choose your <br />
+            <span className="text-cyan-300 italic lowercase tracking-normal">creative</span> power.
+          </h1>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {plans.map((p) => (
             <PricingCard
@@ -343,6 +384,7 @@ const PricingPage = () => {
             </div>
           </div>
         )}
+        </div>
       </main>
     </div>
   );

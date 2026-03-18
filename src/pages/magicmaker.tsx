@@ -1,7 +1,6 @@
 import { Upload, ArrowLeft, Twitter, Instagram, Facebook, Trash, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaMale, FaFemale } from "react-icons/fa";
 // XLSX is dynamically imported when needed to reduce initial bundle size (~500KB saved)
 import {
   generate3DModel,
@@ -529,28 +528,39 @@ const MagicMaker = () => {
   const MAX_AGE = 16;
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-white flex flex-col">
+    <div className="relative min-h-screen bg-dark-bg text-white flex flex-col font-sans selection:bg-neon-cyan selection:text-black overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 -z-0">
+        <div className="absolute -top-28 -left-24 h-[24rem] w-[24rem] rounded-full bg-[#00f2ff]/12 blur-[120px]" />
+        <div className="absolute top-16 right-[-5rem] h-[22rem] w-[22rem] rounded-full bg-[#7000ff]/15 blur-[120px]" />
+      </div>
       {/* Header */}
-      <header className="w-full border-b border-white/5 backdrop-blur-xl bg-[#0f172a]/80 sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+      <header className="w-full border-b border-white/10 backdrop-blur-xl bg-black/40 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
-              className="inline-flex items-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 px-4 py-2 text-sm border border-white/10 backdrop-blur-sm transition-all hover:scale-105 hover:shadow-lg hover:shadow-white/5"
+              className="inline-flex items-center gap-2 rounded-xl glass px-4 py-2 text-[11px] uppercase tracking-widest font-bold border border-white/10 transition-all hover:bg-white/10 hover:scale-105"
               onClick={() => navigate(-1)}
             >
               <ArrowLeft className="h-4 w-4" />
               Back
             </button>
-          <div className="text-3xl sm:text-4xl font-black tracking-[0.25em] italic">
-            <span className="bg-gradient-to-r from-fuchsia-300 via-white to-sky-300 bg-clip-text text-transparent drop-shadow-2xl">3DGENI</span>
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="flex items-center gap-2 group cursor-pointer"
+            >
+              <div className="w-8 h-8 bg-gradient-action rounded-lg flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
+                <span className="w-5 h-5 rounded-md bg-white" />
+              </div>
+              <span className="text-lg font-bold tracking-tighter uppercase">3DGENI</span>
+            </button>
             </div>
-          </div>
           <div className="flex items-center gap-3">
             <div
-              className="p-[2px] rounded-full bg-gradient-to-r from-fuchsia-500 via-violet-400 to-sky-400 shadow-lg shadow-fuchsia-500/20"
+              className="p-[2px] rounded-full bg-gradient-action shadow-[0_0_20px_rgba(112,0,255,0.35)]"
               title={user?.name || "Profile"}
             >
-              <div className="h-10 w-10 rounded-full bg-[#0f172a] text-white flex items-center justify-center font-extrabold tracking-wide shadow-inner">
+              <div className="h-10 w-10 rounded-full bg-[#07070a] text-white flex items-center justify-center font-extrabold tracking-wide shadow-inner">
                 {(user?.name || "U").split("@")[0].slice(0,1).toUpperCase()}
               </div>
             </div>
@@ -559,44 +569,52 @@ const MagicMaker = () => {
       </header>
 
       {/* Main */}
-      <main className="flex-1 w-full" style={{ scrollBehavior: 'smooth' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <main className="flex-1 w-full relative z-10" style={{ scrollBehavior: 'smooth' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
           {/* Headline */}
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-8 text-white tracking-[0.02em] text-center">
-            <span className="inline-block transform-gpu bg-gradient-to-r from-white via-white to-white/90 bg-clip-text text-transparent" style={{
-              textShadow: `
-                0 2px 4px rgba(0, 0, 0, 0.3),
-                0 4px 8px rgba(0, 0, 0, 0.2),
-                0 8px 16px rgba(0, 0, 0, 0.1),
-                0 0 30px rgba(255, 255, 255, 0.15)
-              `,
-              transform: 'perspective(500px) rotateX(5deg)',
-              display: 'inline-block',
-              letterSpacing: '0.03em'
-            }}>
-              Transform your child's imagination into 3D magic!
-            </span>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-8 text-center tracking-tight">
+            <span className="text-white">Transform your child's imagination into </span>
+            <span className="text-[#00f2ff]">3D</span>
+            <span className="text-white"> magic</span>
+            <span className="text-[#ff8a00]">.</span>
           </h1>
+          <div className="max-w-5xl mx-auto mb-8 rounded-2xl glass border border-white/10 px-4 py-3 flex flex-wrap items-center justify-center gap-3 text-[10px] uppercase tracking-[0.2em]">
+            <div className="inline-flex items-center gap-2 text-white/70">
+              <Sparkles className="h-3.5 w-3.5 text-[#00f2ff]" />
+              <span>Status: {statusMessage}</span>
+            </div>
+            <span className="hidden sm:inline text-white/20">|</span>
+            <span className="text-white/60">Model: <span className="text-white">{model || "Not selected"}</span></span>
+            <span className="hidden sm:inline text-white/20">|</span>
+            <span className="text-white/60">Accessory: <span className="text-white">{selectedAccessoryLabel}</span></span>
+            {generating && (
+              <>
+                <span className="hidden sm:inline text-white/20">|</span>
+                <span className="text-[#00f2ff]">ETA: {estimatedSecondsLeft}s</span>
+              </>
+            )}
+          </div>
 
           {/* Top Section: Upload (Left) and Preview (Right) */}
           <div className="flex justify-center mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full" style={{ maxWidth: '90%' }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-[92%]">
             {/* Left: Upload Photo */}
-            <div className="rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_48px_rgba(0,0,0,0.4),0_6px_24px_rgba(0,0,0,0.3)] transition-all duration-300 hover:border-white/20 focus-within:ring-2 focus-within:ring-white/20 focus-within:outline-none">
+            <div className="rounded-2xl glass border border-white/10 p-6 shadow-[0_0_30px_rgba(0,242,255,0.08)] transition-all duration-300 hover:border-[#00f2ff]/30 focus-within:ring-2 focus-within:ring-[#00f2ff]/30 focus-within:outline-none">
               <div className="mb-5">
-                <div className="font-bold text-white text-lg mb-1 tracking-wide" style={{ textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)' }}>Upload any picture</div>
-                <div className="text-sm text-white/60 tracking-normal">Select from your device</div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-white/40 mb-2 font-bold">Input</div>
+                <div className="font-bold text-white text-lg mb-1">Upload any picture</div>
+                <div className="text-sm text-white/60">Select from your device</div>
               </div>
               
               {/* Photo Preview Area */}
-              <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-yellow-200 via-orange-200 to-sky-200 flex items-center justify-center shadow-[inset_0_2px_8px_rgba(0,0,0,0.1)] ring-1 ring-white/10 max-h-[60vh]">
+              <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-[#0b0b12] via-[#101022] to-[#17132a] flex items-center justify-center shadow-[inset_0_2px_20px_rgba(0,0,0,0.45)] ring-1 ring-white/10 max-h-[60vh]">
                 {previewUrl ? (
                   <img src={previewUrl} alt="Upload preview" className="w-full h-full object-cover" />
                 ) : (
                   <div className="text-center flex flex-col items-center justify-center h-full">
-                    <div className="text-black/60 text-sm mb-3">Upload preview</div>
+                    <div className="text-white/50 text-sm mb-3">Upload preview</div>
                     <button
-                      className="inline-flex items-center gap-2 rounded-xl bg-white text-[#0f172a] hover:bg-white/90 px-5 py-2.5 text-sm font-bold shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.2)] transition-all hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent"
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-action text-white hover:opacity-95 px-5 py-2.5 text-sm font-bold shadow-[0_0_20px_rgba(112,0,255,0.35)] transition-all hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#00f2ff]/40 focus:ring-offset-2 focus:ring-offset-transparent"
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <Upload className="h-4 w-4" />
@@ -607,7 +625,7 @@ const MagicMaker = () => {
                 {previewUrl && (
                   <>
                     <button
-                      className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-xl bg-black/80 hover:bg-red-600/90 text-white transition-all shadow-lg hover:scale-110 backdrop-blur-sm"
+                      className="absolute top-3 right-3 inline-flex items-center justify-center h-9 w-9 rounded-xl glass border border-white/15 hover:border-red-400/40 hover:bg-red-500/20 text-white transition-all hover:scale-110 backdrop-blur-sm"
                       onClick={() => {
                         if (previewUrl) URL.revokeObjectURL(previewUrl);
                         if (rawImageUrl) URL.revokeObjectURL(rawImageUrl);
@@ -626,7 +644,7 @@ const MagicMaker = () => {
                       <Trash className="h-4 w-4" />
                     </button>
                     <button
-                      className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-xl bg-black/80 hover:bg-black/90 text-white px-3 py-1.5 text-xs font-medium transition-all shadow-lg hover:scale-105 backdrop-blur-sm"
+                      className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-xl glass border border-white/15 hover:bg-white/10 text-white px-3 py-1.5 text-xs font-medium transition-all hover:scale-105 backdrop-blur-sm"
                       onClick={() => {
                         if (rawImageUrl) {
                           setCropOpen(true);
@@ -658,20 +676,21 @@ const MagicMaker = () => {
             </div>
 
             {/* Right: Preview Image */}
-            <div className="rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/10 p-6 shadow-[0_8px_32px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_48px_rgba(0,0,0,0.4),0_6px_24px_rgba(0,0,0,0.3)] transition-all duration-300 hover:border-white/20 focus-within:ring-2 focus-within:ring-white/20 focus-within:outline-none">
+            <div className="rounded-2xl glass border border-white/10 p-6 shadow-[0_0_30px_rgba(112,0,255,0.12)] transition-all duration-300 hover:border-[#7000ff]/35 focus-within:ring-2 focus-within:ring-[#7000ff]/25 focus-within:outline-none">
               <div className="mb-5">
-                <div className="font-bold text-white text-lg mb-1 tracking-wide" style={{ textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)' }}>Choose a fun cartoon style</div>
-                <div className="text-sm text-white/60 tracking-normal">Pick a style that suits your child's personality</div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-white/40 mb-2 font-bold">Preview</div>
+                <div className="font-bold text-white text-lg mb-1">Choose a fun cartoon style</div>
+                <div className="text-sm text-white/60">Pick a style that suits your child's personality</div>
               </div>
               
-              <div className="aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-purple-200 via-pink-200 to-orange-200 flex items-center justify-center relative mb-4 shadow-[inset_0_2px_8px_rgba(0,0,0,0.1)] ring-1 ring-white/10 max-h-[60vh]">
+              <div className="aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-[#0d0b16] via-[#18122a] to-[#1f1430] flex items-center justify-center relative mb-4 shadow-[inset_0_2px_20px_rgba(0,0,0,0.5)] ring-1 ring-white/10 max-h-[60vh]">
                 {previewGenerating ? (
                   <div className="text-center space-y-4">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
                     <div className="text-white font-medium">Generating preview... {Math.round(previewProgress)}%</div>
-                    <div className="w-48 bg-white/20 rounded-full h-2 mx-auto">
+                    <div className="w-48 bg-white/15 rounded-full h-2 mx-auto">
                       <div
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                        className="bg-gradient-to-r from-[#00f2ff] to-[#7000ff] h-2 rounded-full transition-all duration-300 shadow-[0_0_12px_rgba(0,242,255,0.4)]"
                         style={{ width: `${previewProgress}%` }}
                       />
                     </div>
@@ -684,7 +703,7 @@ const MagicMaker = () => {
                       className="w-full h-full object-cover"
                     />
                     {model && (
-                      <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                      <div className="absolute top-2 right-2 glass border border-white/15 text-white text-[10px] uppercase tracking-widest px-2 py-1 rounded">
                         {model}
                       </div>
                     )}
@@ -711,9 +730,9 @@ const MagicMaker = () => {
                       }
                     }}
                     disabled={!previewImageUrl && !previewUrl}
-                    className={`inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 py-2.5 px-4 text-sm font-medium transition-all backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-transparent ${
+                    className={`inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 py-2.5 px-4 text-[11px] uppercase tracking-widest font-bold transition-all duration-300 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-[#00f2ff]/35 focus:ring-offset-2 focus:ring-offset-transparent ${
                       (previewImageUrl || previewUrl)
-                        ? "bg-white/10 hover:bg-white/20 text-white hover:scale-105 hover:shadow-lg"
+                        ? "glass hover:bg-white/10 text-white hover:scale-105"
                         : "bg-white/5 text-white/40 cursor-not-allowed"
                     }`}
                   >
@@ -736,7 +755,7 @@ const MagicMaker = () => {
                       }
                     }}
                     disabled={!readyForPreview || previewGenerating}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 py-2.5 px-4 text-sm font-medium transition-all backdrop-blur-sm hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl glass hover:bg-white/10 text-white border border-white/15 py-2.5 px-4 text-[11px] uppercase tracking-widest font-bold transition-all duration-300 backdrop-blur-sm hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#7000ff]/35 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                   >
                     Retry
                   </button>
@@ -777,22 +796,26 @@ const MagicMaker = () => {
                 type="button"
                 onClick={startGeneration}
                 disabled={!previewUrl || generating}
-                className={`inline-flex items-center justify-center rounded-2xl px-10 py-5 font-extrabold text-lg transition-all shadow-[0_8px_24px_rgba(0,0,0,0.3)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent ${
+                className={`relative group inline-flex items-center justify-center rounded-2xl px-10 py-5 font-extrabold text-[10px] uppercase tracking-[0.2em] transition-all duration-300 shadow-[0_0_30px_rgba(112,0,255,0.3)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent overflow-hidden ${
                   previewUrl && !generating
-                    ? "bg-yellow-400 text-[#0f172a] hover:bg-yellow-300 hover:scale-105 hover:shadow-[0_12px_32px_rgba(234,179,8,0.4)] focus:ring-yellow-400/50"
+                    ? "bg-gradient-action text-white hover:opacity-95 hover:scale-105 focus:ring-[#7000ff]/45"
                     : "bg-white/10 text-white/40 cursor-not-allowed focus:ring-white/20"
-                } ${generating ? "animate-pulse shadow-yellow-400/30" : ""}`}
+                } ${generating ? "animate-pulse shadow-[0_0_40px_rgba(0,242,255,0.25)]" : ""}`}
               >
-                {generating ? `Creating 3D Model... ${Math.round(progress)}%` : "Create 3D Model"}
+                {!generating && <div className="absolute inset-0 shimmer opacity-0 group-hover:opacity-100 transition-opacity" />}
+                <span className="relative">{generating ? `Creating 3D Model... ${Math.round(progress)}%` : "Create 3D Model"}</span>
               </button>
             </div>
           )}
 
           {/* 3D Model Viewer */}
           {previewUrl && (
-            <div className="rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/10 p-8 shadow-[0_8px_32px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.2)]">
+            <div className="rounded-2xl glass border border-white/10 p-8 shadow-[0_0_40px_rgba(112,0,255,0.12)]">
               <div className="flex items-center justify-center mb-6">
-                <h4 className="text-xl font-extrabold text-white tracking-wide" style={{ textShadow: '0 2px 6px rgba(0, 0, 0, 0.3)' }}>3D Model</h4>
+                <div className="text-center">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-1">Output</p>
+                  <h4 className="text-xl font-extrabold text-white">3D Model</h4>
+                </div>
                 {resultModelUrl && (resultModelUrl.endsWith('.glb') || resultModelUrl.endsWith('.obj')) && (
                   <div className="flex gap-2 ml-auto">
                     <button
@@ -809,7 +832,7 @@ const MagicMaker = () => {
                         }
                       }}
                       disabled={generating}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 py-2.5 px-5 text-sm font-medium transition-all backdrop-blur-sm hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl glass hover:bg-white/10 text-white border border-white/15 py-2.5 px-5 text-sm font-medium transition-all backdrop-blur-sm hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                     >
                       Retry
                     </button>
@@ -826,7 +849,7 @@ const MagicMaker = () => {
                             }
                           });
                         }}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-2.5 px-5 text-sm transition-all shadow-lg hover:scale-105 hover:shadow-yellow-400/30"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-action text-white font-bold py-2.5 px-5 text-sm transition-all shadow-[0_0_20px_rgba(112,0,255,0.3)] hover:opacity-95 hover:scale-105"
                       >
                         <Download className="h-4 w-4" />
                         Download All
@@ -838,7 +861,7 @@ const MagicMaker = () => {
               {resultModelUrl && (resultModelUrl.endsWith('.glb') || resultModelUrl.endsWith('.obj')) ? (
                 <div className="flex flex-col items-center gap-8">
                   <div className="w-full max-w-4xl">
-                    <div className="aspect-[16/9] max-h-[450px] rounded-2xl overflow-hidden bg-black/60 shadow-2xl ring-1 ring-white/10">
+                    <div className="aspect-[16/9] max-h-[450px] rounded-2xl overflow-hidden bg-black/60 shadow-2xl ring-1 ring-[#00f2ff]/20">
                       <Suspense
                         fallback={
                           <div className="w-full h-full flex items-center justify-center text-white/70 text-sm">
@@ -859,7 +882,7 @@ const MagicMaker = () => {
                             key={idx}
                             href={currentJobId ? getResultFileUrl(currentJobId, file) : '#'}
                             download
-                            className="inline-flex items-center justify-center gap-2 text-sm bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl px-4 py-3 text-white/80 hover:text-white transition-all backdrop-blur-sm hover:scale-105 hover:shadow-lg"
+                            className="inline-flex items-center justify-center gap-2 text-sm glass hover:bg-white/10 border border-white/15 rounded-xl px-4 py-3 text-white/80 hover:text-white transition-all backdrop-blur-sm hover:scale-105"
                           >
                             <Download className="h-4 w-4" />
                             {file.split('/').pop()}
@@ -870,14 +893,14 @@ const MagicMaker = () => {
                   )}
                 </div>
               ) : generating ? (
-                <div className="aspect-[16/9] max-h-[450px] max-w-4xl mx-auto rounded-2xl overflow-hidden bg-black/60 flex items-center justify-center shadow-2xl ring-1 ring-white/10">
+                <div className="aspect-[16/9] max-h-[450px] max-w-4xl mx-auto rounded-2xl overflow-hidden bg-black/60 flex items-center justify-center shadow-2xl ring-1 ring-[#7000ff]/25">
                   <div className="text-center space-y-5 px-4">
-                    <div className="animate-spin rounded-full h-20 w-20 border-4 border-white/20 border-t-yellow-400 mx-auto shadow-lg"></div>
+                    <div className="animate-spin rounded-full h-20 w-20 border-4 border-white/20 border-t-[#00f2ff] mx-auto shadow-lg"></div>
                     <div className="text-white font-semibold text-xl">Generating 3D Model...</div>
                     <div className="text-sm text-white/70">{Math.round(progress)}% complete</div>
                     <div className="w-72 mx-auto bg-white/10 rounded-full h-2.5 shadow-inner">
                       <div
-                        className="bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500 h-2.5 rounded-full transition-all duration-300 shadow-lg shadow-yellow-400/30"
+                        className="bg-gradient-to-r from-[#00f2ff] via-[#3a88ff] to-[#7000ff] h-2.5 rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(0,242,255,0.35)]"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
@@ -959,17 +982,17 @@ const MagicMaker = () => {
 
 
       {/* Footer */}
-      <footer className="mt-auto w-full py-8 border-t border-white/10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/70">
+      <footer className="mt-auto w-full py-8 border-t border-white/10 bg-black/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/70">
           <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-white">Privacy Policy</a>
-            <a href="#" className="hover:text-white">Terms of Service</a>
-            <a href="#" className="hover:text-white">Contact Us</a>
+            <a href="#" className="text-white/40 hover:text-white transition-colors">Privacy Policy</a>
+            <a href="#" className="text-white/40 hover:text-white transition-colors">Terms of Service</a>
+            <a href="#" className="text-white/40 hover:text-white transition-colors">Contact Us</a>
           </div>
           <div className="flex items-center gap-4">
-            <a href="#" className="hover:text-white" aria-label="Twitter"><Twitter className="h-5 w-5" /></a>
-            <a href="#" className="hover:text-white" aria-label="Instagram"><Instagram className="h-5 w-5" /></a>
-            <a href="#" className="hover:text-white" aria-label="Facebook"><Facebook className="h-5 w-5" /></a>
+            <a href="#" className="text-white/60 hover:text-white transition-colors" aria-label="Twitter"><Twitter className="h-5 w-5" /></a>
+            <a href="#" className="text-white/60 hover:text-white transition-colors" aria-label="Instagram"><Instagram className="h-5 w-5" /></a>
+            <a href="#" className="text-white/60 hover:text-white transition-colors" aria-label="Facebook"><Facebook className="h-5 w-5" /></a>
           </div>
         </div>
       </footer>

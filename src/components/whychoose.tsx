@@ -25,13 +25,13 @@ const features = [
 
 const WhyChooseUs = () => {
   return (
-    <section className="py-20 relative">
-      <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent"></div>
+    <section className="py-32 px-6 relative">
+      <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent"></div>
       
-      <div className="container mx-auto px-6 relative z-10">
+      <div className="container mx-auto relative z-10">
         <div className="text-center mb-16">
-          <h2 className="text-4xl lg:text-5xl font-bold mb-4">Why Choose Us?</h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          <h2 className="text-5xl md:text-6xl font-bold uppercase tracking-tight mb-4">Why Choose Us?</h2>
+          <p className="text-white/40 text-lg max-w-2xl mx-auto">
             We make creativity accessible to everyone with cutting-edge AI technology.
           </p>
         </div>
@@ -42,14 +42,14 @@ const WhyChooseUs = () => {
             return (
               <div
                 key={index}
-                className="bg-card border border-border rounded-2xl p-6 hover:border-primary/50 transition-all duration-300 hover:-translate-y-2 group"
+                className="glass rounded-2xl p-6 hover:-translate-y-2 transition-all duration-500 group"
               >
-                <div className="w-14 h-14 bg-primary/20 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Icon className="w-7 h-7 text-primary" />
+                <div className="w-14 h-14 bg-gradient-action rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-[0_0_20px_rgba(112,0,255,0.3)]">
+                  <Icon className="w-7 h-7 text-white" />
                 </div>
                 
-                <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                <p className="text-muted-foreground text-sm">
+                <h3 className="text-xl font-bold mb-2 text-white">{feature.title}</h3>
+                <p className="text-white/55 text-sm">
                   {feature.description}
                 </p>
               </div>

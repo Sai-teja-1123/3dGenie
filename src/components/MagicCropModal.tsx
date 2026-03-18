@@ -138,13 +138,12 @@ const MagicCropModal = ({ open, imageUrl, onClose, onCropped }: MagicCropModalPr
   if (!open || !imageUrl) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl max-h[90vh] bg-[#0b1222]/95 backdrop-blur-xl text-white rounded-3xl border border-white/10 p-6 sm:p-8 select-none flex flex-col shadow-2xl shadow-black/50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl max-h[90vh] glass text-white rounded-3xl border border-white/10 p-6 sm:p-8 select-none flex flex-col shadow-[0_0_40px_rgba(0,242,255,0.15)] overflow-y-auto">
         <div className="flex items-center justify-between mb-6 flex-shrink-0">
           <div>
-            <h3 className="text-xl font-extrabold tracking-wide" style={{ textShadow: "0 2px 6px rgba(0, 0, 0, 0.3)" }}>
-              Crop to Select Face
-            </h3>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-white/45 font-bold mb-1">Image Tool</p>
+            <h3 className="text-xl font-extrabold">Crop to Select Face</h3>
             <p className="text-sm text-white/60 mt-1">Adjust the crop area to focus on the face</p>
           </div>
           <button
@@ -157,7 +156,7 @@ const MagicCropModal = ({ open, imageUrl, onClose, onCropped }: MagicCropModalPr
 
         <div
           ref={cropContainerRef}
-          className="relative w-full flex-1 min-h-0 rounded-2xl overflow-hidden bg-black/70 border border-white/10 select-none shadow-2xl ring-1 ring-white/5"
+          className="relative w-full flex-1 min-h-0 rounded-2xl overflow-hidden bg-black/70 border border-white/10 select-none shadow-2xl ring-1 ring-[#00f2ff]/20"
           style={{ minHeight: "400px", maxHeight: "calc(90vh - 200px)", aspectRatio: "4 / 3" }}
           onMouseDown={(e) => {
             const rect = cropContainerRef.current?.getBoundingClientRect();
@@ -239,7 +238,7 @@ const MagicCropModal = ({ open, imageUrl, onClose, onCropped }: MagicCropModalPr
           <canvas ref={cropCanvasRef} className="absolute inset-0 w-full h-full" />
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="absolute border-2 border-yellow-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"
+            className="absolute border-2 border-[#00f2ff] shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"
             style={{ left: cropRect.x, top: cropRect.y, width: cropRect.size, height: cropRect.size }}
           >
             {(["nw", "ne", "sw", "se"] as const).map((pos) => {
@@ -247,7 +246,7 @@ const MagicCropModal = ({ open, imageUrl, onClose, onCropped }: MagicCropModalPr
               const style = {
                 width: 14,
                 height: 14,
-                background: "#fde047",
+                background: "#00f2ff",
                 borderRadius: 3,
                 position: "absolute" as const,
                 left: pos.includes("e") ? cropRect.size - half : -half,
@@ -274,13 +273,13 @@ const MagicCropModal = ({ open, imageUrl, onClose, onCropped }: MagicCropModalPr
 
         <div className="mt-6 flex justify-end gap-3 flex-shrink-0">
           <button
-            className="bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded-xl px-6 py-3 font-medium transition-all hover:scale-105 hover:shadow-lg backdrop-blur-sm"
+            className="glass hover:bg-white/10 text-white border border-white/10 rounded-xl px-6 py-3 text-[11px] uppercase tracking-widest font-bold transition-all hover:scale-105 backdrop-blur-sm"
             onClick={onClose}
           >
             Cancel
           </button>
           <button
-            className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold rounded-xl px-8 py-3 transition-all hover:scale-105 hover:shadow-xl hover:shadow-yellow-400/30"
+            className="relative group bg-gradient-action text-white font-bold rounded-xl px-8 py-3 text-[11px] uppercase tracking-widest transition-all hover:opacity-95 hover:scale-105 shadow-[0_0_20px_rgba(112,0,255,0.3)] overflow-hidden"
             onClick={() => {
               const viewCanvas = cropCanvasRef.current;
               const img = cropImgRef.current;
@@ -313,7 +312,8 @@ const MagicCropModal = ({ open, imageUrl, onClose, onCropped }: MagicCropModalPr
               }, "image/jpeg", 0.92);
             }}
           >
-            Done
+            <div className="absolute inset-0 shimmer opacity-0 group-hover:opacity-100 transition-opacity" />
+            <span className="relative">Done</span>
           </button>
         </div>
       </div>

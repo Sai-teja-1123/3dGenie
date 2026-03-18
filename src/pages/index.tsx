@@ -6,7 +6,7 @@ import { useEffect, lazy } from "react";
 
 // Lazy load heavy components - load only when near viewport (IntersectionObserver)
 const HowItWorks = lazy(() => import("@/components/howitworks"));
-const WhyChooseUs = lazy(() => import("@/components/whychoose"));
+const FeaturesGrid = lazy(() => import("@/components/features-grid"));
 const Gallery = lazy(() => import("@/components/gallery"));
 
 // Loading fallback for lazy components
@@ -34,10 +34,10 @@ const Index = () => {
         {HowItWorks}
       </LazyWhenVisible>
       <LazyWhenVisible fallback={<SectionLoader />} minHeight="120px">
-        {WhyChooseUs}
+        {Gallery}
       </LazyWhenVisible>
       <LazyWhenVisible fallback={<SectionLoader />} minHeight="120px">
-        {Gallery}
+        {FeaturesGrid}
       </LazyWhenVisible>
       <Footer />
     </div>

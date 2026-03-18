@@ -1,4 +1,3 @@
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
 import { cn } from "@/library/utils";
@@ -22,49 +21,97 @@ export const PricingCard = ({
   isSelected,
   onSelect,
 }: PricingCardProps) => {
+  const isCustom = title === "Studio";
+  const color =
+    title === "Starter" ? "#00f2ff" : title === "Pro" ? "#7000ff" : "#ff8a00";
+  const displayPrice = isCustom ? "Custom" : `₹${price}`;
+  const description =
+    title === "Starter"
+      ? "Perfect for hobbyists and explorers."
+      : title === "Pro"
+      ? "For professional creators and studios."
+      : "Tailored solutions for large teams.";
+
   return (
-    <Card
+    <div
       className={cn(
-        "p-6 relative transition-all duration-300 hover:scale-105 cursor-pointer bg-gradient-card border-2",
-        isSelected 
-          ? "border-primary shadow-glow" 
-          : "border-border hover:border-primary/50",
-        isPopular && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+        "bento-card flex flex-col justify-between relative group cursor-pointer",
+        isPopular && "neon-border-purple scale-105 z-10",
+        isSelected && "ring-2 ring-[#00f2ff]"
       )}
       onClick={onSelect}
     >
       {isPopular && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="bg-gradient-primary px-4 py-1 rounded-full text-xs font-semibold text-primary-foreground">
-            POPULAR
-          </span>
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-[#7000ff] text-white text-[10px] uppercase tracking-widest font-bold shadow-[0_0_20px_rgba(112,0,255,0.5)]">
+          Most Popular
         </div>
       )}
-      <div className="text-center mb-6">
-        <h3 className="text-xl font-bold text-foreground mb-2">{title}</h3>
-        <div className="flex items-baseline justify-center gap-1">
-          <span className="text-4xl font-bold text-primary">₹{price}</span>
-          <span className="text-muted-foreground">/{period}</span>
+
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="space-y-2">
+          <p
+            className="text-[10px] uppercase tracking-[0.3em] font-bold"
+            style={{ color }}
+          >
+            {title}
+          </p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-4xl font-bold tracking-tighter">
+              {displayPrice}
+            </span>
+            {!isCustom && (
+              <span className="text-white/40 text-sm uppercase tracking-widest">
+                /{period}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-white/40 leading-relaxed">{description}</p>
         </div>
+
+        <div className="h-px bg-white/10 w-full" />
+
+        {/* Features */}
+        <ul className="space-y-4">
+          {features.map((feature) => (
+            <li
+              key={feature}
+              className="flex items-center gap-3 text-xs text-white/60"
+            >
+              <div
+                className="w-4 h-4 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: `${color}1a` }}
+              >
+                <Check className="w-2.5 h-2.5" style={{ color }} />
+              </div>
+              {feature}
+            </li>
+          ))}
+        </ul>
       </div>
-      <ul className="space-y-3 mb-6">
-        {features.map((feature, index) => (
-          <li key={index} className="flex items-start gap-2">
-            <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-            <span className="text-sm text-muted-foreground">{feature}</span>
-          </li>
-        ))}
-      </ul>
-      <Button
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelect();
-        }}
-        className="w-full bg-gradient-primary hover:opacity-90 text-primary-foreground font-semibold transition-all"
-      >
-        Select Plan
-      </Button>
-    </Card>
+
+      {/* Button */}
+      <div className="pt-12">
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
+          className={cn(
+            "w-full py-4 rounded-2xl text-[11px] uppercase tracking-[0.2em] font-bold transition-all duration-300",
+            isPopular
+              ? "bg-gradient-action text-white shadow-[0_0_30px_rgba(112,0,255,0.3)] hover:scale-[1.02]"
+              : "glass hover:bg-white/10 text-white"
+          )}
+        >
+          {title === "Starter"
+            ? "Get Started"
+            : title === "Pro"
+            ? "Go Pro"
+            : "Contact Sales"}
+        </Button>
+      </div>
+    </div>
   );
 };
 
