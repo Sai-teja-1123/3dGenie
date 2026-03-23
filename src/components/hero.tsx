@@ -42,37 +42,37 @@ const Hero = memo(() => {
 
       <div className="relative z-10 max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 lg:gap-14 items-center lg:items-start">
         {/* Left: text content */}
-        <div className="space-y-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5">
+        <div className="space-y-5">
+          <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-cyan-300/35 bg-cyan-500/5">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-300 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-300"></span>
             </span>
-            <span className="text-[10px] uppercase tracking-[0.2em] text-white/60">AI 3D Engine Live</span>
+            <span className="text-xs uppercase tracking-[0.14em] text-cyan-300 font-semibold">
+              AI-Powered · Ready-to-Print STL Files · Physical Shipping Coming Soon
+            </span>
           </div>
 
-          <h1 className="text-5xl md:text-[4.8rem] lg:text-[6.4rem] font-extrabold tracking-tight leading-[0.85] uppercase">
-            <span className="block text-white">Bring your</span>
-            <span className="block">
-              <span className="text-[#00f2ff] text-glow-cyan italic font-display lowercase tracking-normal">
-                ideas
-              </span>{" "}
-              <span className="text-white">to</span>
+          <h1 className="text-[4.3rem] md:text-[5.6rem] lg:text-[6.2rem] font-extrabold tracking-tight leading-[0.94] uppercase">
+            <span className="block text-white">Turn your</span>
+            <span
+              className="block mb-2 uppercase italic font-display font-extrabold tracking-normal text-[#00f2ff] text-glow-cyan md:mb-3"
+            >
+              CHILD&apos;S PHOTO
             </span>
-            <span className="block text-white">
-              life in <span className="text-[#ff8a00]">3D</span>.
-            </span>
+            <span className="block text-[#f97316]">into 3D.</span>
           </h1>
 
-          <p className="text-lg md:text-xl text-white/50 max-w-xl leading-relaxed">
-            Professional AI-powered 3D content creation. Generate high-fidelity 3D assets in seconds and bring your
-            imagination to life.
+          <p className="text-base md:text-lg text-white/55 max-w-xl leading-relaxed">
+            Upload a photo, pick a <strong className="text-white font-semibold">superhero style</strong>, and get
+            a custom <strong className="text-white font-semibold">3D-printable STL file</strong> ready for home
+            or print-shop use.
           </p>
 
           <div className="flex flex-wrap gap-4">
             <Button
               size="lg"
-              className="bg-gradient-action hover:opacity-90 text-white rounded-full px-8 py-6 text-lg group shadow-[0_0_30px_rgba(112,0,255,0.4)]"
+              className="bg-gradient-action hover:opacity-90 text-white rounded-full px-8 py-5 text-lg group shadow-[0_0_30px_rgba(112,0,255,0.4)]"
               onClick={() => {
                 const token = localStorage.getItem("auth_token");
                 if (token) {
@@ -82,7 +82,7 @@ const Hero = memo(() => {
                 }
               }}
             >
-              START CREATING
+              Create Your Hero - Get STL File
               <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform motion-reduce:transition-none" />
             </Button>
             <button className="flex items-center gap-3 px-8 py-4 rounded-full glass text-sm font-medium text-white/80 hover:bg-white/10 transition-all duration-300">
@@ -90,18 +90,18 @@ const Hero = memo(() => {
             </button>
           </div>
 
-          <div className="pt-8 flex flex-wrap gap-8 border-t border-white/10">
-            <div>
-              <p className="text-2xl font-bold">12k+</p>
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Assets Generated</p>
+          <div className="pt-3 flex flex-wrap gap-3 text-xs md:text-sm">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-white/75">
+              <span>🔒</span>
+              <span>Secure photo handling</span>
             </div>
-            <div>
-              <p className="text-2xl font-bold">99.9%</p>
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Uptime Score</p>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-white/75">
+              <span>🖨️</span>
+              <span>Print anywhere</span>
             </div>
-            <div>
-              <p className="text-2xl font-bold">2.4s</p>
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Avg. Render Time</p>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-white/75">
+              <span>⭐</span>
+              <span>4.9/5 rating</span>
             </div>
           </div>
         </div>

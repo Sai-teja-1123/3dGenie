@@ -633,7 +633,7 @@ const AnimeCharacter = memo(({ modelUrl }: { modelUrl?: string | null }) => {
         <ModelWrapper>
           <mesh position={[0, 0.1, 0]}>
             <sphereGeometry args={[3.5, 32, 32]} />
-            <meshStandardMaterial color="#8b5cf6" wireframe emissive="#8b5cf6" emissiveIntensity={0.3} />
+            <meshStandardMaterial color="#8b5cf6" emissive="#8b5cf6" emissiveIntensity={0.15} roughness={0.65} metalness={0.05} transparent opacity={0.22} />
           </mesh>
         </ModelWrapper>
       </ModelEffects>

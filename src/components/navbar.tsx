@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import LogoMark from "@/components/logo-mark";
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -37,6 +38,15 @@ const Navbar = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const goToSection = (sectionId: string) => {
+    if (location.pathname !== "/") {
+      navigate("/", { state: { scrollTo: sectionId } });
+      return;
+    }
+    const el = document.getElementById(sectionId);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <div className="fixed top-8 left-0 right-0 z-50 flex justify-center px-6">
       <nav
@@ -47,38 +57,42 @@ const Navbar = () => {
         {/* Brand */}
         <button
           type="button"
-          onClick={() => navigate("/")}
+          onClick={() => {
+            if (location.pathname !== "/") {
+              navigate("/");
+              setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 80);
+            } else {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
           className="flex items-center gap-2 group cursor-pointer"
         >
-          <div className="w-8 h-8 bg-gradient-action rounded-lg flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
-            <span className="w-5 h-5 rounded-md bg-white" />
-          </div>
+          <LogoMark className="h-8 w-8 transition-transform duration-300 group-hover:scale-105" />
           <span className="text-lg font-bold tracking-tighter uppercase">3DGENI</span>
         </button>
 
         {/* Center navigation (anchors + pricing) */}
-        <div className="hidden md:flex items-center gap-8 text-[10px] uppercase tracking-[0.2em] text-white/40">
+        <div className="hidden md:flex items-center gap-8 text-sm uppercase tracking-[0.14em] text-white/50">
           <button
             type="button"
-            onClick={() => {
-              navigate("/");
-              const el = document.getElementById("showcase");
-              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
+            onClick={() => goToSection("how")}
+            className="hover:text-white transition-colors"
+          >
+            How It Works
+          </button>
+          <button
+            type="button"
+            onClick={() => goToSection("showcase")}
             className="hover:text-white transition-colors"
           >
             Showcase
           </button>
           <button
             type="button"
-            onClick={() => {
-              navigate("/");
-              const el = document.getElementById("features");
-              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
+            onClick={() => goToSection("reviews")}
             className="hover:text-white transition-colors"
           >
-            Features
+            Reviews
           </button>
           <button
             type="button"

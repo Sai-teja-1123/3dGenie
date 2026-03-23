@@ -1,6 +1,7 @@
 import { Upload, ArrowLeft, Twitter, Instagram, Facebook, Trash, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
+import LogoMark from "@/components/logo-mark";
 // XLSX is dynamically imported when needed to reduce initial bundle size (~500KB saved)
 import {
   generate3DModel,
@@ -549,9 +550,7 @@ const MagicMaker = () => {
               onClick={() => navigate("/")}
               className="flex items-center gap-2 group cursor-pointer"
             >
-              <div className="w-8 h-8 bg-gradient-action rounded-lg flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
-                <span className="w-5 h-5 rounded-md bg-white" />
-              </div>
+              <LogoMark className="h-8 w-8 transition-transform duration-300 group-hover:scale-105" />
               <span className="text-lg font-bold tracking-tighter uppercase">3DGENI</span>
             </button>
             </div>

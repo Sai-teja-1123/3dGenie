@@ -1,26 +1,39 @@
 import { memo, useState } from "react";
-import knightImg from "../gallery 3d models/character-knight.jpg";
-import superheroImg from "../gallery 3d models/character-superhero.jpg";
-import fairyImg from "../gallery 3d models/character-fairy.jpg";
-import astronautImg from "../gallery 3d models/character-astronaut.jpg";
+import fairyImg from "../gallery 3d models/character-fairy.png";
+import astronautImg from "../gallery 3d models/character-astronaut.png";
+import superheroImg from "../gallery 3d models/character-superhero.png";
+import elsaImg from "../gallery 3d models/elsabg.png";
+import bossBabyImg from "../gallery 3d models/bossbaby-blue.png";
+import onePieceImg from "../gallery 3d models/one-piece-blue.png";
+import snowWhiteImg from "../gallery 3d models/snowwhite-blue.png";
+import moanaImg from "../gallery 3d models/moana-blue.png";
 
 const galleryImages = [
-  { id: 1, src: knightImg, title: "Knight" },
-  { id: 2, src: superheroImg, title: "Superhero" },
-  { id: 3, src: fairyImg, title: "Fairy" },
-  { id: 4, src: astronautImg, title: "Astronaut" },
+  { id: 1, src: onePieceImg, title: "Adventure Hero" },
+  { id: 2, src: snowWhiteImg, title: "Classic Princess" },
+  { id: 3, src: superheroImg, title: "Superhero" },
+  { id: 4, src: elsaImg, title: "Ice Princess" },
+  { id: 5, src: astronautImg, title: "Astronaut" },
+  { id: 6, src: fairyImg, title: "Fairy" },
+  { id: 7, src: bossBabyImg, title: "Business Baby" },
+  { id: 8, src: moanaImg, title: "Island Princess" },
 ];
+
+const FEATURED_COUNT = 4;
 
 const Gallery = memo(() => {
   const [showAll, setShowAll] = useState(false);
-  const visibleImages = showAll ? galleryImages : galleryImages.slice(0, 4);
+  const hasMoreThanFeatured = galleryImages.length > FEATURED_COUNT;
+  const visibleImages = showAll || !hasMoreThanFeatured
+    ? galleryImages
+    : galleryImages.slice(0, FEATURED_COUNT);
 
   return (
-    <section id="showcase" className="py-32 px-6">
+    <section className="py-32 px-6">
       <div className="max-w-7xl mx-auto space-y-16">
         <div className="flex flex-col md:flex-row justify-between items-end gap-8">
           <div className="space-y-4">
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight uppercase">
+            <h2 className="text-5xl md:text-6xl font-bold tracking-tighter uppercase">
               Community <br /> Showcase
             </h2>
             <p className="text-white/40 max-w-md">
@@ -28,13 +41,15 @@ const Gallery = memo(() => {
               engine.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowAll((prev) => !prev)}
-            className="px-8 py-4 rounded-full glass hover:bg-white/10 transition-all text-[11px] uppercase tracking-widest"
-          >
-            {showAll ? "View Featured" : "View All Assets"}
-          </button>
+          {hasMoreThanFeatured && (
+            <button
+              type="button"
+              onClick={() => setShowAll((prev) => !prev)}
+              className="px-8 py-4 rounded-full glass hover:bg-white/10 transition-all text-[11px] uppercase tracking-widest"
+            >
+              {showAll ? "View Featured" : "View All Assets"}
+            </button>
+          )}
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">

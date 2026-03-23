@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 
-const Footer = () => {
-  const navigate = useNavigate();
+const ShippingBetaBanner = () => {
   const [showWaitlist, setShowWaitlist] = useState(false);
   const [waitlistEmail, setWaitlistEmail] = useState("");
   const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
@@ -20,42 +18,29 @@ const Footer = () => {
 
   return (
     <>
-      <footer id="contact" className="py-16 border-t border-border">
-        <div className="container mx-auto px-6">
-          <div className="grid md:grid-cols-3 gap-8 mb-8">
-            <div>
-              <div className="text-2xl font-bold mb-3">3D GENIE</div>
-              <p className="text-sm text-muted-foreground max-w-xs">
-                Turn your child&apos;s photo into a custom 3D hero with a smooth, guided creation flow.
+      <section className="px-6 pb-24">
+        <div className="max-w-7xl mx-auto">
+          <div className="rounded-2xl border border-cyan-300/25 bg-cyan-400/5 px-8 py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="max-w-3xl">
+              <div className="text-cyan-300 font-semibold mb-2">🚀 Physical Shipping - Coming Soon (Beta)</div>
+              <p className="text-white/70 leading-relaxed">
+                We&apos;re working on printing and shipping physical figures directly to your door. Currently in
+                private beta. Join the waitlist to be first in line when it opens in your region.
               </p>
             </div>
-
-            <div>
-              <h3 className="font-bold mb-4">Support</h3>
-              <ul className="space-y-2">
-                <li><button type="button" onClick={() => navigate("/help/faqs")} className="text-left text-muted-foreground hover:text-primary transition-colors">FAQs</button></li>
-                <li><button type="button" onClick={() => navigate("/help/contact")} className="text-left text-muted-foreground hover:text-primary transition-colors">Contact Us</button></li>
-                <li><button type="button" onClick={() => setShowWaitlist(true)} className="text-left text-muted-foreground hover:text-primary transition-colors">Shipping Beta</button></li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-bold mb-4">Legal</h3>
-              <ul className="space-y-2">
-                <li><button type="button" onClick={() => navigate("/legal/privacy")} className="text-left text-muted-foreground hover:text-primary transition-colors">Privacy Policy</button></li>
-                <li><button type="button" onClick={() => navigate("/legal/terms")} className="text-left text-muted-foreground hover:text-primary transition-colors">Terms of Use</button></li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="border-t border-border pt-8 text-center text-muted-foreground">
-            <p>© 3DGENI. All rights reserved</p>
+            <button
+              type="button"
+              onClick={() => setShowWaitlist(true)}
+              className="shrink-0 rounded-xl bg-cyan-400 text-[#080810] px-7 py-3 font-bold hover:bg-cyan-300 transition-colors"
+            >
+              Join Waitlist →
+            </button>
           </div>
         </div>
-      </footer>
+      </section>
 
       {showWaitlist && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-md px-4">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 backdrop-blur-md px-4">
           <div className="relative w-full max-w-md rounded-2xl border border-cyan-300/35 bg-[#13131f] p-8 shadow-2xl">
             <button
               type="button"
@@ -111,4 +96,4 @@ const Footer = () => {
   );
 };
 
-export default Footer;
+export default ShippingBetaBanner;
