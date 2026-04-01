@@ -178,3 +178,4 @@ backend/payments.db
 
 # Local spreadsheets (keep out of git/GitHub)
 *.xlsx
+!public/character-prompts-v3.xlsx
