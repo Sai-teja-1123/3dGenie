@@ -65,6 +65,6 @@ class JobResultResponse(BaseModel):
 class HealthResponse(BaseModel):
     """Health check response"""
     status: Literal["healthy", "unhealthy"] = Field(..., description="Service health status")
-    comfyui_connected: bool = Field(..., description="Whether ComfyUI is reachable")
+    comfyui_connected: bool = Field(..., description="Legacy compatibility field")
     message: str = Field(..., description="Health message")
 

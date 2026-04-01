@@ -1,58 +1,100 @@
 """Status and result endpoints"""
-from typing import Dict
+from __future__ import annotations
+
+from typing import Dict, Optional
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.models.schemas import JobStatusResponse, JobResultResponse, JobStatus
-from app.services.comfyui import ComfyUIClient
-from app.routes.generate import job_store, get_comfyui_client, get_storage_path
+from app.services.tripo3d import Tripo3DService, Tripo3DError
+from app.routes.generate import job_store, get_storage_path
+import os
 
 
 router = APIRouter(prefix="/api", tags=["status"])
 
 
-def update_job_status(job_id: str, comfyui: ComfyUIClient) -> Dict:
-    """Update job status by checking ComfyUI history"""
+def _update_tripo_job_status(job_id: str) -> Optional[Dict]:
+    """Update Tripo-backed job status by polling Tripo task API."""
     if job_id not in job_store:
         return None
-    
+
     job = job_store[job_id]
-    prompt_id = job.get("prompt_id")
-    
-    if not prompt_id:
+    task_id = job.get("tripo_task_id")
+    if not task_id:
         return job
-    
+
+    status = job.get("status")
+    if status in (JobStatus.COMPLETED, JobStatus.FAILED) and job.get("output_files"):
+        return job
+
+    tripo_key = os.getenv("TRIPO_API_KEY")
+    if not tripo_key:
+        job["status"] = JobStatus.FAILED
+        job["error"] = "TRIPO_API_KEY is not configured"
+        return job
+
     try:
-        history = comfyui.get_history(prompt_id)
-        
-        if history and len(history.get("outputs", {})) > 0:
-            # Workflow completed
-            job["status"] = JobStatus.COMPLETED
-            job["history"] = history
-            
-            # Get output files
-            output_files = comfyui.get_output_files(prompt_id)
-            job["output_files"] = output_files
-            
-        elif history is None:
-            # Check if still in queue
-            queue = comfyui.get_queue()
-            in_queue = any(
-                item.get("prompt_id") == prompt_id 
-                for item in queue.get("queue_running", []) + queue.get("queue_pending", [])
-            )
-            
-            if in_queue:
-                job["status"] = JobStatus.PROCESSING
-            else:
-                # Not found in queue or history - might be processing
-                job["status"] = JobStatus.PROCESSING
-        
-    except Exception as e:
-        # If we can't check status, assume it's processing
+        tripo = Tripo3DService(tripo_key)
+        task_data = tripo.get_task(task_id)
+    except Tripo3DError as e:
         job["status"] = JobStatus.PROCESSING
-        job["error"] = str(e) if "error" not in job else job["error"]
-    
+        job["error"] = str(e)
+        return job
+
+    raw_status = (task_data.get("status") or "").lower()
+    job["tripo_task_status"] = raw_status
+    job["progress"] = task_data.get("progress")
+
+    if raw_status in {"success", "completed", "done"}:
+        model_url = tripo.extract_model_url(task_data)
+        if not model_url:
+            job["status"] = JobStatus.FAILED
+            job["error"] = "Tripo task succeeded but no model URL was returned"
+            return job
+
+        try:
+            model_bytes, ext = tripo.download_model(model_url)
+        except Tripo3DError as e:
+            job["status"] = JobStatus.FAILED
+            job["error"] = f"Tripo model download failed: {str(e)}"
+            return job
+
+        results_dir = get_storage_path() / "results" / job_id
+        results_dir.mkdir(parents=True, exist_ok=True)
+        output_filename = f"tripo_model{ext}"
+        output_path = results_dir / output_filename
+        with open(output_path, "wb") as f:
+            f.write(model_bytes)
+
+        job["status"] = JobStatus.COMPLETED
+        job["output_files"] = [output_filename]
+        job["local_result_files"] = {output_filename: str(output_path)}
+        job["tripo_result_url"] = model_url
+        return job
+
+    if raw_status in {"failed", "error", "canceled", "cancelled"}:
+        job["status"] = JobStatus.FAILED
+        job["error"] = task_data.get("message") or "Tripo task failed"
+        return job
+
+    # Queue/running/in progress statuses
+    job["status"] = JobStatus.PROCESSING
+    return job
+
+
+def update_job_status(job_id: str) -> Optional[Dict]:
+    """Dispatch status updates by provider/workflow type."""
+    if job_id not in job_store:
+        return None
+
+    job = job_store[job_id]
+    workflow_type = job.get("workflow_type")
+
+    if workflow_type == "tripo_3d":
+        return _update_tripo_job_status(job_id)
     return job
 
 
@@ -66,8 +108,7 @@ async def get_job_status(job_id: str):
     if job_id not in job_store:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    comfyui = get_comfyui_client()
-    job = update_job_status(job_id, comfyui)
+    job = update_job_status(job_id)
     
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -80,7 +121,15 @@ async def get_job_status(job_id: str):
     if status == JobStatus.PENDING:
         progress = 0.0
     elif status == JobStatus.PROCESSING:
-        progress = 50.0  # Rough estimate
+        # Prefer provider-reported progress when available.
+        provider_progress = job.get("progress")
+        if provider_progress is not None:
+            try:
+                progress = float(provider_progress)
+            except (TypeError, ValueError):
+                progress = 50.0
+        else:
+            progress = 50.0
     elif status == JobStatus.COMPLETED:
         progress = 100.0
     
@@ -103,8 +152,7 @@ async def get_job_result(job_id: str):
     if job_id not in job_store:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    comfyui = get_comfyui_client()
-    job = update_job_status(job_id, comfyui)
+    job = update_job_status(job_id)
     
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -136,8 +184,8 @@ async def get_job_result(job_id: str):
             message="No output files found"
         )
     
-    # For now, return file paths relative to ComfyUI
-    # In production, you'd upload these to S3/Cloudflare R2 and return URLs
+    # For now, return filenames stored on local backend storage.
+    # In production, you'd upload to object storage and return URLs.
     result_files = output_files
     
     return JobResultResponse(
@@ -148,13 +196,35 @@ async def get_job_result(job_id: str):
     )
 
 
+@router.post("/cancel/{job_id}")
+async def cancel_job(job_id: str):
+    """
+    Cancel a running or queued generation job
+    
+    - **job_id**: Job identifier to cancel
+    """
+    if job_id not in job_store:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    job = job_store[job_id]
+    status = job.get("status")
+    if status in (JobStatus.COMPLETED, JobStatus.FAILED):
+        return JSONResponse(
+            content={"message": "Job is already finished", "cancelled": False}
+        )
+    # Tripo cancel endpoint is not integrated in this backend.
+    return JSONResponse(
+        content={"message": "Cancel is not supported for current provider", "cancelled": False}
+    )
+
+
 @router.get("/result/{job_id}/download/{filename:path}")
 async def download_result(job_id: str, filename: str):
     """
     Download a specific result file
     
     - **job_id**: Job identifier
-    - **filename**: Output filename (path relative to ComfyUI output folder)
+    - **filename**: Output filename
     """
     if job_id not in job_store:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -164,19 +234,24 @@ async def download_result(job_id: str, filename: str):
     if job.get("status") != JobStatus.COMPLETED:
         raise HTTPException(status_code=400, detail="Job not completed yet")
     
-    comfyui = get_comfyui_client()
-    storage_path = get_storage_path()
-    
-    try:
-        # Download from ComfyUI
-        save_path = storage_path / "results" / filename
-        downloaded_path = comfyui.download_file(filename, str(save_path))
-        
-        return FileResponse(
-            downloaded_path,
-            media_type="application/octet-stream",
-            filename=Path(filename).name
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to download file: {str(e)}")
+    local_result_files = job.get("local_result_files", {})
+    local_path = local_result_files.get(filename)
+
+    if not local_path:
+        # Fallback to expected per-job result location if mapping is missing.
+        candidate_path = get_storage_path() / "results" / job_id / filename
+        if candidate_path.exists():
+            local_path = str(candidate_path)
+
+    if not local_path:
+        raise HTTPException(status_code=404, detail="Result file not found on server")
+
+    if not Path(local_path).exists():
+        raise HTTPException(status_code=404, detail="Result file not found on server")
+
+    return FileResponse(
+        local_path,
+        media_type="application/octet-stream",
+        filename=Path(local_path).name
+    )
 

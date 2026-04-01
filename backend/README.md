@@ -1,4 +1,4 @@
-# AI Forge Backend API
+# 3DGENI Backend API
 
 FastAPI backend for integrating ComfyUI workflows with the frontend application.
 
@@ -38,12 +38,16 @@ FastAPI backend for integrating ComfyUI workflows with the frontend application.
     - `seed`: Random seed (optional)
 
 ### 3D Model Generation
-- `POST /api/generate-3d` - Generate 3D model using Hunyuan3D workflow
+- `POST /api/generate-3d` - Generate 3D model from image
   - Body: multipart/form-data
     - `image`: Image file
     - `style`: Style selection (optional)
     - `steps`: Inference steps (optional, default: 50)
     - `seed`: Random seed (optional)
+
+If `TRIPO_API_KEY` is configured, the endpoint uses Tripo image-to-model workflow and
+auto-resizes/compresses input images to fit Tripo constraints. If not configured, it
+falls back to the existing ComfyUI 3D workflow.
 
 ### Job Status
 - `GET /api/status/{job_id}` - Get job status and progress
@@ -58,6 +62,10 @@ FastAPI backend for integrating ComfyUI workflows with the frontend application.
 - `DEBUG` - Enable debug mode (default: false)
 - `CORS_ORIGINS` - Allowed CORS origins (comma-separated)
 - `STORAGE_PATH` - Path for storing uploaded files (default: storage/uploads)
+- `TRIPO_API_KEY` - Tripo image-to-3D API key (enables Tripo provider for `/generate-3d`)
+- `TRIPO_BASE_URL` - Tripo OpenAPI base URL
+- `TRIPO_MAX_IMAGE_MB` - Input image target size before Tripo upload (default: 10)
+- `TRIPO_MAX_DIMENSION` - Maximum input image dimension before Tripo upload (default: 2048)
 
 ## API Documentation
 
@@ -100,6 +108,21 @@ python test_connection.py
 2. Make sure ComfyUI is running and accessible at `COMFYUI_URL`
 3. Test health endpoint: `curl http://localhost:8000/health`
 4. Use the interactive docs at `/docs` to test endpoints
+
+## RunPod GPU Setup (Recommended)
+
+For cloud GPU deployment on RunPod:
+
+1. **Quick Start:** See [QUICK_START_RUNPOD.md](QUICK_START_RUNPOD.md) for 1-hour test guide
+2. **Detailed Guide:** See [RUNPOD_SETUP.md](RUNPOD_SETUP.md) for complete setup instructions
+
+### Quick RunPod Steps:
+1. Sign up at https://www.runpod.io
+2. Deploy A40 GPU pod with ComfyUI template
+3. Get endpoint URL from pod details
+4. Update `COMFYUI_URL` in `.env` file
+5. Test connection: `python test_runpod_connection.py`
+6. Start backend and test!
 
 ## Local Setup Guide
 
