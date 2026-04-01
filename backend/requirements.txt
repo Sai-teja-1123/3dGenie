@@ -11,7 +11,12 @@ python-dotenv==1.0.0
 
 # Data validation
 pydantic==2.5.3
+google-auth==2.35.0
+PyJWT==2.9.0
 
-# Optional: For async file operations (if needed)
-aiofiles==23.2.1
+# Image processing for testing
+Pillow==10.2.0
+
+# Razorpay payment gateway
+razorpay>=1.4.0
 

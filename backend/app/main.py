@@ -1,17 +1,20 @@
-"""FastAPI application main file"""
+"""FastAPI application main file."""
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.routes import generate, status
 from app.models.schemas import HealthResponse
-from app.services.comfyui import ComfyUIClient
-import os
+from app.routes import auth, generate, status
+
+# Load environment variables from .env file at startup
+load_dotenv()
 
 
 app = FastAPI(
-    title="AI Forge API",
-    description="Backend API for ComfyUI workflow integration",
+    title="3DGENI API",
+    description="Backend API for image and 3D generation",
     version="1.0.0"
 )
 
@@ -27,17 +30,22 @@ app.add_middleware(
 # Include routers
 app.include_router(generate.router)
 app.include_router(status.router)
+app.include_router(auth.router)
 
-# Validation router (for testing without ComfyUI)
+# Validation router (for local sanity checks)
 from app.routes import validate
 app.include_router(validate.router)
+
+# Payments router (Razorpay)
+from app.routes import payments
+app.include_router(payments.router)
 
 
 @app.get("/", response_class=JSONResponse)
 async def root():
     """Root endpoint"""
     return {
-        "message": "AI Forge API",
+        "message": "3DGENI API",
         "version": "1.0.0",
         "docs": "/docs"
     }
@@ -46,27 +54,17 @@ async def root():
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """
-    Health check endpoint
-    
-    Returns service health and ComfyUI connection status
+    Health check endpoint.
+
+    Returns service status and provider readiness.
     """
-    try:
-        comfyui_url = os.getenv("COMFYUI_URL", "http://localhost:8188")
-        api_key = os.getenv("COMFYUI_API_KEY")
-        comfyui = ComfyUIClient(comfyui_url, api_key)
-        comfyui_connected = comfyui.health_check()
-        
-        return HealthResponse(
-            status="healthy" if comfyui_connected else "unhealthy",
-            comfyui_connected=comfyui_connected,
-            message="Service is running" if comfyui_connected else "Service running but ComfyUI is unreachable"
-        )
-    except Exception as e:
-        return HealthResponse(
-            status="unhealthy",
-            comfyui_connected=False,
-            message=f"Health check failed: {str(e)}"
-        )
+    tripo_configured = bool(os.getenv("TRIPO_API_KEY"))
+    return HealthResponse(
+        status="healthy",
+        # Keep this field for frontend compatibility.
+        comfyui_connected=False,
+        message="Service is running" if tripo_configured else "Service is running (TRIPO_API_KEY not configured)"
+    )
 
 
 if __name__ == "__main__":
