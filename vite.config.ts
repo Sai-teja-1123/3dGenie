@@ -27,8 +27,6 @@ export default defineConfig({
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
           'ui-vendor': ['lucide-react', 'react-icons', 'tailwind-merge', 'clsx'],
-          'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
-          'utils-vendor': ['date-fns', 'recharts'],
         },
       },
     },

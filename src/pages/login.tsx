@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { CredentialResponse, GoogleLogin, GoogleOAuthProvider } from "@react-oauth/google";
+import { ApiError, authenticateWithGoogle, getGoogleClientConfig } from "@/services/api";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -8,6 +10,10 @@ const LoginPage = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
+  const [googleConfigLoading, setGoogleConfigLoading] = useState(true);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+  const [googleSigningIn, setGoogleSigningIn] = useState(false);
 
   const params = new URLSearchParams(location.search);
   const redirectTo = params.get("redirect") || "/magic-maker";
@@ -19,6 +25,24 @@ const LoginPage = () => {
     }
   }, [navigate, redirectTo]);
 
+  useEffect(() => {
+    const loadGoogleConfig = async () => {
+      setGoogleConfigLoading(true);
+      setGoogleError(null);
+      try {
+        const cfg = await getGoogleClientConfig();
+        setGoogleClientId(cfg.client_id);
+      } catch (error) {
+        const message = error instanceof ApiError ? error.message : "Unable to load Google sign-in config";
+        setGoogleError(message);
+      } finally {
+        setGoogleConfigLoading(false);
+      }
+    };
+
+    loadGoogleConfig();
+  }, []);
+
   const onEmailPasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (email && password) {
@@ -29,17 +53,50 @@ const LoginPage = () => {
     }
   };
 
-  const onGoogle = () => {
-    localStorage.setItem("auth_token", "google-demo-token");
-    localStorage.setItem("auth_user", JSON.stringify({ name: "Google User" }));
-    navigate(redirectTo, { replace: true });
-  };
+  const onGoogleSuccess = useCallback(async (credentialResponse: CredentialResponse) => {
+    const googleIdToken = credentialResponse.credential;
+    if (!googleIdToken) {
+      setGoogleError("Google sign-in did not return a credential token.");
+      return;
+    }
 
-  const onFacebook = () => {
-    localStorage.setItem("auth_token", "facebook-demo-token");
-    localStorage.setItem("auth_user", JSON.stringify({ name: "Facebook User" }));
-    navigate(redirectTo, { replace: true });
-  };
+    setGoogleSigningIn(true);
+    setGoogleError(null);
+    try {
+      const authResponse = await authenticateWithGoogle(googleIdToken);
+      localStorage.setItem("auth_token", authResponse.token);
+      localStorage.setItem("auth_user", JSON.stringify(authResponse.user));
+      navigate(redirectTo, { replace: true });
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Google sign-in failed";
+      setGoogleError(message);
+    } finally {
+      setGoogleSigningIn(false);
+    }
+  }, [navigate, redirectTo]);
+
+  const onGoogleError = useCallback(() => {
+    setGoogleError("Google sign-in popup failed. Try again.");
+  }, []);
+
+  const googleButton = useMemo(() => {
+    if (!googleClientId) return null;
+    return (
+      <GoogleOAuthProvider clientId={googleClientId}>
+        <GoogleLogin
+          onSuccess={onGoogleSuccess}
+          onError={onGoogleError}
+          useOneTap={false}
+          text="signin_with"
+          theme="filled_black"
+          shape="pill"
+          size="large"
+          logo_alignment="left"
+          width="340"
+        />
+      </GoogleOAuthProvider>
+    );
+  }, [googleClientId, onGoogleError, onGoogleSuccess]);
 
   return (
     <div className="min-h-screen bg-dark-bg text-white flex items-center justify-center px-6 py-12 overflow-hidden relative font-sans">
@@ -101,22 +158,26 @@ const LoginPage = () => {
           </div>
 
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                onClick={onGoogle}
-                className="glass hover:bg-white/10 border border-white/15 rounded-xl py-3 font-semibold text-[11px] uppercase tracking-widest text-white"
-                type="button"
-              >
-                Google
-              </Button>
-              <Button
-                onClick={onFacebook}
-                className="glass hover:bg-white/10 border border-white/15 rounded-xl py-3 font-semibold text-[11px] uppercase tracking-widest text-white"
-                type="button"
-              >
-                Facebook
-              </Button>
+            <div className="space-y-3">
+              <div className="glass border border-white/15 rounded-xl py-2 px-3 min-h-[52px] flex items-center justify-center">
+                {googleConfigLoading ? (
+                  <span className="text-[11px] uppercase tracking-widest text-white/60">Loading Google...</span>
+                ) : googleButton ? (
+                  googleButton
+                ) : (
+                  <span className="text-[11px] uppercase tracking-widest text-red-300">Google unavailable</span>
+                )}
+              </div>
+              <p className="text-[10px] text-white/45 text-center uppercase tracking-[0.18em]">
+                Continue with Google
+              </p>
             </div>
+            {googleSigningIn && (
+              <p className="text-[11px] text-white/60 text-center">Verifying Google account...</p>
+            )}
+            {googleError && (
+              <p className="text-[11px] text-red-300 text-center">{googleError}</p>
+            )}
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

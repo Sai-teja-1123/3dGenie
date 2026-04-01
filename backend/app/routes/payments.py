@@ -11,6 +11,7 @@ from app.services.payment_db import (
     update_payment_record,
     get_payment_by_order_id,
 )
+from app.services.auth_jwt import decode_access_token
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +53,15 @@ def get_razorpay_client():
 
 
 def get_user_id(authorization: str | None) -> str:
-    """Extract user identifier from token. For demo, use token as user_id."""
+    """Extract user identifier from bearer token."""
     if authorization and authorization.startswith("Bearer "):
-        return authorization[7:]  # Strip "Bearer "
+        token = authorization[7:]  # Strip "Bearer "
+        try:
+            payload = decode_access_token(token)
+            return str(payload.get("sub") or payload.get("email") or token)
+        except HTTPException:
+            # Backward compatible fallback for older demo tokens.
+            return token
     return "anonymous"
 
 

@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { lazy, Suspense, useEffect } from "react";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import Index from "./pages/index";
+import { ApiError, getCurrentUser } from "./services/api";
 
 // Lazy load pages for code splitting - reduces initial bundle by 40-60%
 // Index page loaded normally to avoid blank screen issues
@@ -85,9 +86,45 @@ const ScrollToTop = () => {
   return null;
 };
 
+const AuthBootstrap = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const validatedTokenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    if (!token) return;
+    if (validatedTokenRef.current === token) return;
+    validatedTokenRef.current = token;
+
+    const validateSession = async () => {
+      try {
+        const me = await getCurrentUser(token);
+        localStorage.setItem("auth_user", JSON.stringify(me.user));
+      } catch (error) {
+        const statusCode = error instanceof ApiError ? error.statusCode : undefined;
+        if (statusCode === 401) {
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("auth_user");
+          validatedTokenRef.current = null;
+          if (location.pathname !== "/login") {
+            const redirect = `${location.pathname}${location.search || ""}`;
+            navigate(`/login?redirect=${encodeURIComponent(redirect)}`, { replace: true });
+          }
+        }
+      }
+    };
+
+    validateSession();
+  }, [location.pathname, location.search, navigate]);
+
+  return null;
+};
+
 const App = () => (
   <BrowserRouter>
     <ScrollToTop />
+    <AuthBootstrap />
     <Routes>
       <Route path="/" element={<Index />} />
       <Route path="/login" element={<LazyLoginPage />} />

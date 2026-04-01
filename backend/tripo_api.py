@@ -1,10 +1,16 @@
 import requests
 import time
+import os
 from pathlib import Path
 from PIL import Image
 import io
+from dotenv import load_dotenv
 
-api_key = "tsk_J2vgzFYGmKzetChU9LeTXGTkKKODAoDmSCMWIKm-KeM"
+load_dotenv()
+
+api_key = os.getenv("TRIPO_API_KEY")
+if not api_key:
+    raise ValueError("TRIPO_API_KEY is not set. Add it to backend/.env before running this script.")
 
 # Create output directory if it doesn't exist
 output_dir = Path("3d_models")

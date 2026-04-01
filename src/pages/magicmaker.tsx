@@ -12,6 +12,14 @@ import {
   ApiError,
 } from "@/services/api";
 import { Download } from "lucide-react";
+import {
+  GLOBAL_POSITIVE_PROMPT,
+  normalizeCharacterName,
+  applyNameVariations,
+  resolveCharacterPrompt,
+  buildCombinedPositivePrompt,
+  buildCombinedNegativePrompt,
+} from "@/library/promptBuilder";
 
 type ColorPart = "hair" | "outfit" | "skin" | "shoes";
 
@@ -77,7 +85,7 @@ const MagicMaker = () => {
   });
   const [selectedAccessory, setSelectedAccessory] = useState<string | null>(null);
   const [customNotes, setCustomNotes] = useState("");
-  const [promptsMap, setPromptsMap] = useState<Map<string, string>>(new Map());
+  const [characterPromptsMap, setCharacterPromptsMap] = useState<Map<string, string>>(new Map());
   const [promptsLoaded, setPromptsLoaded] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -101,6 +109,7 @@ const MagicMaker = () => {
   const estimatedSecondsLeft = generating ? Math.max(0, Math.ceil((100 - progress) * 0.35)) : 0;
   const selectedAccessoryLabel = selectedAccessory ? accessoryOptions.find((opt) => opt.id === selectedAccessory)?.label ?? "None" : "None";
   const statusMessage = generationMessage || (readyForCustomization ? "Enter or review your prompt, then create your 3D model." : "Upload a photo and choose a cartoon style to get started.");
+  const showPromptDebug = import.meta.env.DEV && new URLSearchParams(window.location.search).get("showPrompts") === "1";
 
   const handleColorSelect = (part: ColorPart, color: string) => {
     setSelectedColors((prev) => ({ ...prev, [part]: color }));
@@ -286,7 +295,7 @@ const MagicMaker = () => {
       const jobResponse = await generateImage(
         file,
         customNotes,
-        "watermark, text, low quality, blurry",
+        buildCombinedNegativePrompt(model || ""),
         20,
         3.5
       );
@@ -376,13 +385,13 @@ const MagicMaker = () => {
     }
   }, [navigate]);
 
-  // Load prompts from Excel file
+  // Load prompts from v3 Excel file
   useEffect(() => {
     const loadPrompts = async () => {
       try {
         // Dynamically import XLSX only when needed - saves ~500KB from initial bundle
         const XLSX = await import("xlsx");
-        const response = await fetch("/character-prompts.xlsx");
+        const response = await fetch("/character-prompts-v3.xlsx");
         const arrayBuffer = await response.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: "array" });
         const sheetName = workbook.SheetNames[0];
@@ -393,23 +402,6 @@ const MagicMaker = () => {
         const boys: string[] = [];
         const girls: string[] = [];
         
-        // Helper function to normalize model names for matching
-        const normalizeName = (name: string): string => {
-          return name
-            .toLowerCase()
-            .replace(/\s*-\s*/g, " ") // Replace hyphens with spaces
-            .replace(/\s+/g, " ") // Multiple spaces to single space
-            .trim();
-        };
-        
-        // Map to handle name variations between code and Excel
-        const nameVariations: Record<string, string[]> = {
-          "elsa": ["elsa", "elsa - frozen"],
-          "anna": ["anna", "anna- frozen"],
-          "ariel": ["ariel", "little mermaid"],
-          "belle": ["belle", "belle - beauty and the beast"],
-        };
-        
         // Parse Excel data - handle BOY and GIRL columns
         data.forEach((row) => {
           // Process BOY column
@@ -419,7 +411,7 @@ const MagicMaker = () => {
             if (!boys.includes(boyName)) {
               boys.push(boyName);
             }
-            const normalized = normalizeName(boyName);
+            const normalized = normalizeCharacterName(boyName);
             map.set(normalized, boyPrompt);
             // Also store original name for exact match
             map.set(boyName.toLowerCase(), boyPrompt);
@@ -427,33 +419,23 @@ const MagicMaker = () => {
           
           // Process GIRL column
           const girlName = (row["GIRL"] || row["Girl"] || "").toString().trim();
-          const girlPrompt = (row["PROMPT_1"] || row["PROMPT"] || "").toString().trim();
+          const girlPrompt = (row["PROMPT.1"] || row["PROMPT_1"] || "").toString().trim();
           if (girlName && girlPrompt) {
             if (!girls.includes(girlName)) {
               girls.push(girlName);
             }
-            const normalized = normalizeName(girlName);
+            const normalized = normalizeCharacterName(girlName);
             map.set(normalized, girlPrompt);
             // Also store original name for exact match
             map.set(girlName.toLowerCase(), girlPrompt);
           }
         });
-        
-        // Add variations mapping
-        Object.entries(nameVariations).forEach(([baseName, variations]) => {
-          const prompt = map.get(baseName) || map.get(variations[0]);
-          if (prompt) {
-            variations.forEach(variation => {
-              if (!map.has(variation)) {
-                map.set(variation, prompt);
-              }
-            });
-          }
-        });
+
+        applyNameVariations(map);
         
         setBoysList(boys.sort());
         setGirlsList(girls.sort());
-        setPromptsMap(map);
+        setCharacterPromptsMap(map);
         setPromptsLoaded(true);
       } catch (error) {
         console.error("Failed to load prompts from Excel:", error);
@@ -467,63 +449,29 @@ const MagicMaker = () => {
   // Auto-populate prompt when model is selected
   useEffect(() => {
     if (model && promptsLoaded) {
-      const modelName = model;
-      
-      // Helper function to normalize model names for matching
-      const normalizeName = (name: string): string => {
-        return name
-          .toLowerCase()
-          .replace(/\s*-\s*/g, " ") // Replace hyphens with spaces
-          .replace(/\s+/g, " ") // Multiple spaces to single space
-          .trim();
-      };
-      
-      // Try exact match first
-      let prompt = promptsMap.get(modelName.toLowerCase());
-      
-      // Try normalized match
-      if (!prompt) {
-        const normalized = normalizeName(modelName);
-        prompt = promptsMap.get(normalized);
-      }
-      
-      // Handle specific name variations
-      const nameVariations: Record<string, string[]> = {
-        "elsa": ["elsa", "elsa - frozen"],
-        "anna": ["anna", "anna- frozen"],
-        "ariel": ["ariel", "little mermaid"],
-        "belle": ["belle", "belle - beauty and the beast"],
-      };
-      
-      if (!prompt) {
-        const lowerName = modelName.toLowerCase();
-        for (const [base, variations] of Object.entries(nameVariations)) {
-          if (variations.includes(lowerName) || lowerName === base) {
-            for (const variation of variations) {
-              prompt = promptsMap.get(variation);
-              if (prompt) break;
-            }
-            if (prompt) break;
-          }
-        }
-      }
-      
-      // Always populate prompt when model is selected
-      if (prompt) {
-        setCustomNotes(prompt);
+      const characterPrompt = resolveCharacterPrompt(characterPromptsMap, model);
+      if (characterPrompt) {
+        setCustomNotes(buildCombinedPositivePrompt(model, characterPrompt));
       } else {
-        // Default prompt for models not in Excel (include model name)
-        const defaultPrompt = `Create a 3D character model inspired by ${modelName}. Make it vibrant, playful, and suitable for children.`;
+        const defaultPrompt = `${GLOBAL_POSITIVE_PROMPT}\n\nCharacter style: ${model}.`;
         setCustomNotes(defaultPrompt);
       }
     }
-  }, [model, promptsLoaded, promptsMap]);
+  }, [model, promptsLoaded, characterPromptsMap]);
 
   const modelOptions: string[] = gender === "male"
     ? boysList
     : gender === "female"
       ? girlsList
       : [...new Set([...boysList, ...girlsList])].sort();
+
+  const debugCharacterPrompt = model ? resolveCharacterPrompt(characterPromptsMap, model) : undefined;
+  const debugPositivePrompt = model
+    ? (debugCharacterPrompt
+      ? buildCombinedPositivePrompt(model, debugCharacterPrompt)
+      : `${GLOBAL_POSITIVE_PROMPT}\n\nCharacter style: ${model}.`)
+    : "";
+  const debugNegativePrompt = buildCombinedNegativePrompt(model || "");
 
   const MIN_AGE = 1;
   const MAX_AGE = 16;
@@ -593,6 +541,28 @@ const MagicMaker = () => {
               </>
             )}
           </div>
+
+          {showPromptDebug && (
+            <div className="max-w-5xl mx-auto mb-8 rounded-2xl border border-yellow-400/30 bg-yellow-400/5 p-4">
+              <p className="text-xs font-bold tracking-widest uppercase text-yellow-300 mb-3">
+                Debug Prompt View (dev only)
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-white/60 mb-2">Positive Prompt</p>
+                  <pre className="whitespace-pre-wrap text-xs text-white/85 bg-black/30 rounded-xl p-3 border border-white/10">
+                    {debugPositivePrompt || "Select a character to preview prompt."}
+                  </pre>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-white/60 mb-2">Negative Prompt</p>
+                  <pre className="whitespace-pre-wrap text-xs text-white/85 bg-black/30 rounded-xl p-3 border border-white/10">
+                    {debugNegativePrompt}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Top Section: Upload (Left) and Preview (Right) */}
           <div className="flex justify-center mb-8">

@@ -4,6 +4,7 @@
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+let googleClientConfigCache: { client_id: string } | null = null;
 
 export interface JobResponse {
   job_id: string;
@@ -26,6 +27,18 @@ export interface JobResultResponse {
   result_files?: string[];
   message: string;
   error?: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string | null;
+}
+
+export interface GoogleAuthResponse {
+  token: string;
+  user: AuthUser;
 }
 
 class ApiError extends Error {
@@ -234,6 +247,54 @@ export async function cancelJob(jobId: string): Promise<{ message: string; cance
  */
 export function getResultFileUrl(jobId: string, filename: string): string {
   return `${API_BASE_URL}/api/result/${jobId}/download/${filename}`;
+}
+
+export async function getGoogleClientConfig(): Promise<{ client_id: string }> {
+  if (googleClientConfigCache) return googleClientConfigCache;
+  const response = await fetch(`${API_BASE_URL}/api/auth/google/config`);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new ApiError(
+      errorData.detail || "Google auth is not configured on backend",
+      response.status,
+      errorData
+    );
+  }
+  const config = await response.json();
+  googleClientConfigCache = config;
+  return config;
+}
+
+export async function authenticateWithGoogle(idToken: string): Promise<GoogleAuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id_token: idToken }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new ApiError(
+      errorData.detail || "Google sign-in failed",
+      response.status,
+      errorData
+    );
+  }
+  return response.json();
+}
+
+export async function getCurrentUser(authToken: string): Promise<{ user: AuthUser }> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new ApiError(
+      errorData.detail || "Session validation failed",
+      response.status,
+      errorData
+    );
+  }
+  return response.json();
 }
 
 /**
