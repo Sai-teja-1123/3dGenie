@@ -175,3 +175,6 @@ backend/app/**/__pycache__/
 backend/storage/
 backend/test_files/
 backend/payments.db
+
+# Local spreadsheets (keep out of git/GitHub)
+*.xlsx
