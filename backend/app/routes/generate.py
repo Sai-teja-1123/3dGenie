@@ -2,18 +2,16 @@
 import os
 import uuid
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
-from fastapi.responses import JSONResponse
 
 from app.models.schemas import (
-    GenerateImageRequest,
-    Generate3DRequest,
     JobResponse,
     JobStatus
 )
-from app.services.comfyui import ComfyUIClient
-from app.services.workflow import WorkflowManager
+from app.services.google_image import GoogleImageService, GoogleImageGenerationError
+from app.services.byteplus_image import BytePlusImageService, BytePlusImageGenerationError
+from app.services.tripo3d import Tripo3DService, Tripo3DError
 
 
 router = APIRouter(prefix="/api", tags=["generation"])
@@ -22,29 +20,28 @@ router = APIRouter(prefix="/api", tags=["generation"])
 job_store: Dict[str, Dict] = {}
 
 
-def get_comfyui_client():
-    """Get ComfyUI client instance (real or mock based on TEST_MODE)"""
-    from app.services.comfyui import ComfyUIClient
-    
-    test_mode = os.getenv("TEST_MODE", "false").lower() == "true"
-    
-    if test_mode:
-        from app.services.mock_comfyui import MockComfyUIClient
-        comfyui_url = os.getenv("COMFYUI_URL", "http://localhost:8188")
-        api_key = os.getenv("COMFYUI_API_KEY")
-        return MockComfyUIClient(comfyui_url, api_key)
-    else:
-        comfyui_url = os.getenv("COMFYUI_URL", "http://localhost:8188")
-        api_key = os.getenv("COMFYUI_API_KEY")
-        return ComfyUIClient(comfyui_url, api_key)
-
-
 def get_storage_path() -> Path:
     """Get storage path for uploaded files"""
     storage = os.getenv("STORAGE_PATH", "storage/uploads")
     path = Path(storage)
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _is_google_quota_or_rate_error(error: GoogleImageGenerationError) -> bool:
+    """Detect Google quota/rate errors that should trigger BytePlus fallback."""
+    if not error:
+        return False
+    if getattr(error, "status_code", None) in (429, 503):
+        return True
+    message = str(error).lower()
+    return any(token in message for token in [
+        "resource_exhausted",
+        "quota",
+        "rate limit",
+        "too many requests",
+        "limit"
+    ])
 
 
 @router.post("/generate-image", response_model=JobResponse)
@@ -80,58 +77,103 @@ async def generate_image(
             content = await image.read()
             f.write(content)
         
-        # Initialize services
-        comfyui = get_comfyui_client()
-        workflow_manager = WorkflowManager()
-        
-        # Upload image to ComfyUI
-        try:
-            comfyui_image_path = comfyui.upload_image(str(local_path))
-        except Exception as e:
+        with open(local_path, "rb") as infile:
+            input_bytes = infile.read()
+        input_mime = image.content_type or "image/jpeg"
+
+        google_api_key = os.getenv("GOOGLE_API_KEY")
+        byteplus_api_key = os.getenv("BYTEPLUS_API_KEY")
+
+        if not google_api_key and not byteplus_api_key:
             raise HTTPException(
-                status_code=503,
-                detail=f"Failed to upload image to ComfyUI: {str(e)}"
+                status_code=500,
+                detail="No image provider configured. Set GOOGLE_API_KEY or BYTEPLUS_API_KEY in backend environment."
             )
-        
-        # Load and modify workflow
-        try:
-            workflow = workflow_manager.load_workflow("flux-image-model.json")
-            workflow = workflow_manager.inject_image_params(
-                workflow,
-                comfyui_image_path,
-                prompt,
-                negative_prompt,
-                steps,
-                guidance,
-                seed
+
+        output_bytes = None
+        output_mime = None
+        provider_used = None
+        google_error: Optional[GoogleImageGenerationError] = None
+
+        # Primary provider: Google
+        if google_api_key:
+            try:
+                google_service = GoogleImageService(google_api_key)
+                output_bytes, output_mime = google_service.generate_image_from_image(
+                    image_bytes=input_bytes,
+                    mime_type=input_mime,
+                    prompt=prompt,
+                    negative_prompt=negative_prompt
+                )
+                provider_used = "google"
+            except GoogleImageGenerationError as e:
+                google_error = e
+
+        # Fallback provider: BytePlus (only for quota/rate issues or when Google key missing)
+        should_try_byteplus = (
+            byteplus_api_key and
+            (
+                not google_api_key or
+                (google_error is not None and _is_google_quota_or_rate_error(google_error))
             )
-        except FileNotFoundError as e:
-            raise HTTPException(status_code=500, detail=f"Workflow not found: {str(e)}")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Workflow error: {str(e)}")
-        
-        # Queue workflow
-        try:
-            prompt_id = comfyui.queue_prompt(workflow)
-        except Exception as e:
-            raise HTTPException(
-                status_code=503,
-                detail=f"Failed to queue workflow in ComfyUI: {str(e)}"
-            )
-        
-        # Store job info
+        )
+
+        if output_bytes is None and should_try_byteplus:
+            try:
+                byteplus_service = BytePlusImageService(byteplus_api_key)
+                output_bytes, output_mime = byteplus_service.generate_image_from_image(
+                    image_bytes=input_bytes,
+                    mime_type=input_mime,
+                    prompt=prompt,
+                    negative_prompt=negative_prompt
+                )
+                provider_used = "byteplus"
+            except BytePlusImageGenerationError as e:
+                if google_error:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=(
+                            f"Google image generation failed: {str(google_error)}. "
+                            f"BytePlus fallback failed: {str(e)}"
+                        )
+                    )
+                raise HTTPException(status_code=500, detail=f"BytePlus image generation failed: {str(e)}")
+
+        if output_bytes is None:
+            if google_error:
+                raise HTTPException(status_code=500, detail=f"Google image generation failed: {str(google_error)}")
+            raise HTTPException(status_code=500, detail="Image generation failed without output")
+
+        # Save generated output as a local result file for existing status/result APIs
+        results_dir = get_storage_path() / "results" / job_id
+        results_dir.mkdir(parents=True, exist_ok=True)
+
+        extension = ".png"
+        if output_mime == "image/jpeg":
+            extension = ".jpg"
+        elif output_mime == "image/webp":
+            extension = ".webp"
+
+        output_filename = f"generated_preview{extension}"
+        output_path = results_dir / output_filename
+        with open(output_path, "wb") as outfile:
+            outfile.write(output_bytes)
+
+        # Store as completed job (frontend can keep polling unchanged)
         job_store[job_id] = {
-            "status": JobStatus.PENDING,
-            "prompt_id": prompt_id,
-            "workflow_type": "image",
+            "status": JobStatus.COMPLETED,
+            "workflow_type": "image_google",
             "local_image_path": str(local_path),
-            "comfyui_image_path": comfyui_image_path
+            "output_files": [output_filename],
+            "local_result_files": {
+                output_filename: str(output_path)
+            }
         }
-        
+
         return JobResponse(
             job_id=job_id,
-            status=JobStatus.PENDING,
-            message=f"Image generation job created. Prompt ID: {prompt_id}"
+            status=JobStatus.COMPLETED,
+            message=f"Image generation completed with {provider_used or 'configured provider'}"
         )
     
     except HTTPException:
@@ -148,7 +190,7 @@ async def generate_3d(
     seed: int = Form(default=None)
 ):
     """
-    Generate a 3D model using the Hunyuan3D workflow
+    Generate a 3D model from an image.
     
     - **image**: Input image file (JPEG, PNG)
     - **style**: 3D style/model selection
@@ -169,55 +211,34 @@ async def generate_3d(
             content = await image.read()
             f.write(content)
         
-        # Initialize services
-        comfyui = get_comfyui_client()
-        workflow_manager = WorkflowManager()
-        
-        # Upload image to ComfyUI
-        try:
-            comfyui_image_path = comfyui.upload_image(str(local_path))
-        except Exception as e:
+        tripo_api_key = os.getenv("TRIPO_API_KEY")
+        if not tripo_api_key:
             raise HTTPException(
-                status_code=503,
-                detail=f"Failed to upload image to ComfyUI: {str(e)}"
+                status_code=500,
+                detail="TRIPO_API_KEY is not configured. 3D generation is unavailable."
             )
-        
-        # Load and modify workflow
+
         try:
-            workflow = workflow_manager.load_workflow("3DModel-Flow.json")
-            workflow = workflow_manager.inject_3d_params(
-                workflow,
-                comfyui_image_path,
-                steps,
-                seed
-            )
-        except FileNotFoundError as e:
-            raise HTTPException(status_code=500, detail=f"Workflow not found: {str(e)}")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Workflow error: {str(e)}")
-        
-        # Queue workflow
-        try:
-            prompt_id = comfyui.queue_prompt(workflow)
-        except Exception as e:
-            raise HTTPException(
-                status_code=503,
-                detail=f"Failed to queue workflow in ComfyUI: {str(e)}"
-            )
-        
-        # Store job info
+            tripo = Tripo3DService(tripo_api_key)
+            tripo_task_id = tripo.create_task_from_image(content, image.content_type)
+        except Tripo3DError as e:
+            raise HTTPException(status_code=500, detail=f"Tripo 3D generation failed: {str(e)}")
+
         job_store[job_id] = {
             "status": JobStatus.PENDING,
-            "prompt_id": prompt_id,
-            "workflow_type": "3d",
+            "workflow_type": "tripo_3d",
+            "tripo_task_id": tripo_task_id,
             "local_image_path": str(local_path),
-            "comfyui_image_path": comfyui_image_path
+            "provider": "tripo",
+            "style": style,
+            "steps": steps,
+            "seed": seed,
         }
-        
+
         return JobResponse(
             job_id=job_id,
             status=JobStatus.PENDING,
-            message=f"3D model generation job created. Prompt ID: {prompt_id}"
+            message=f"Tripo 3D job created. Task ID: {tripo_task_id}"
         )
     
     except HTTPException:
