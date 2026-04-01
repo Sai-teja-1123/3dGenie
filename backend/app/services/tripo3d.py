@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import os
+import time
 from pathlib import Path
 from typing import Optional, Tuple
 from urllib.parse import urlparse
@@ -33,6 +34,8 @@ class Tripo3DService:
         self.max_dimension = int(os.getenv("TRIPO_MAX_DIMENSION", "2048"))
         self.jpeg_quality = int(os.getenv("TRIPO_JPEG_QUALITY", "88"))
         self.request_timeout = int(os.getenv("TRIPO_REQUEST_TIMEOUT_SEC", "180"))
+        self.max_retries = int(os.getenv("TRIPO_MAX_RETRIES", "3"))
+        self.retry_backoff_sec = float(os.getenv("TRIPO_RETRY_BACKOFF_SEC", "1.0"))
         self.task_version = os.getenv("TRIPO_TASK_VERSION", "").strip()
         self._base_urls = self._build_base_urls()
 
@@ -62,10 +65,24 @@ class Tripo3DService:
 
         for base in self._base_urls:
             url = f"{base}{path}"
-            try:
-                response = requests.request(method, url, timeout=self.request_timeout, **kwargs)
-            except requests.RequestException as exc:
-                last_exc = exc
+            response = None
+            for attempt in range(1, max(1, self.max_retries) + 1):
+                try:
+                    response = requests.request(method, url, timeout=self.request_timeout, **kwargs)
+                except requests.RequestException as exc:
+                    last_exc = exc
+                    if attempt < self.max_retries:
+                        time.sleep(self.retry_backoff_sec * attempt)
+                    continue
+
+                # Retry on transient upstream/API failures.
+                if response.status_code in {429, 500, 502, 503, 504} and attempt < self.max_retries:
+                    last_response = response
+                    time.sleep(self.retry_backoff_sec * attempt)
+                    continue
+                break
+
+            if response is None:
                 continue
 
             # Endpoint unavailable in this API version -> try next base URL.
@@ -155,12 +172,25 @@ class Tripo3DService:
         # Important: recreate multipart file object per retry.
         # A consumed stream cannot be reused across fallback attempts.
         for base in self._base_urls:
-            files = {"file": (file_name, io.BytesIO(image_bytes), "image/jpeg")}
             url = f"{base}/upload"
-            try:
-                candidate = requests.post(url, headers=self._headers, files=files, timeout=self.request_timeout)
-            except requests.RequestException as exc:
-                last_exc = exc
+            candidate = None
+            for attempt in range(1, max(1, self.max_retries) + 1):
+                files = {"file": (file_name, io.BytesIO(image_bytes), "image/jpeg")}
+                try:
+                    candidate = requests.post(url, headers=self._headers, files=files, timeout=self.request_timeout)
+                except requests.RequestException as exc:
+                    last_exc = exc
+                    if attempt < self.max_retries:
+                        time.sleep(self.retry_backoff_sec * attempt)
+                    continue
+
+                if candidate.status_code in {429, 500, 502, 503, 504} and attempt < self.max_retries:
+                    response = candidate
+                    time.sleep(self.retry_backoff_sec * attempt)
+                    continue
+                break
+
+            if candidate is None:
                 continue
 
             if self._should_try_next_base(candidate) and base != self._base_urls[-1]:
