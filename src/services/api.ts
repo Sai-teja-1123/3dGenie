@@ -265,6 +265,23 @@ export async function getGoogleClientConfig(): Promise<{ client_id: string }> {
   return config;
 }
 
+export async function authenticateWithDemo(email: string, password: string): Promise<GoogleAuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/demo`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new ApiError(
+      errorData.detail || "Sign-in failed",
+      response.status,
+      errorData
+    );
+  }
+  return response.json();
+}
+
 export async function authenticateWithGoogle(idToken: string): Promise<GoogleAuthResponse> {
   const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
     method: "POST",

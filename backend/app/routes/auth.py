@@ -61,10 +61,16 @@ async def google_sign_in(payload: GoogleAuthRequest):
         token_info = id_token.verify_oauth2_token(
             payload.id_token,
             google_requests.Request(),
-            client_id
+            client_id,
+            clock_skew_in_seconds=10,
         )
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid Google ID token")
+    except Exception as exc:
+        import logging
+        logging.error("Google token verification failed: %s | client_id used: %s", exc, client_id[:20] + "...")
+        raise HTTPException(
+            status_code=401,
+            detail=f"Invalid Google ID token: {exc}"
+        )
 
     email = token_info.get("email")
     email_verified = token_info.get("email_verified", False)
@@ -92,6 +98,38 @@ async def google_sign_in(payload: GoogleAuthRequest):
             email=email,
             name=name,
             picture=picture,
+        ),
+    )
+
+
+class DemoAuthRequest(BaseModel):
+    """Request payload for demo email/password sign-in."""
+    email: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+
+
+@router.post("/demo", response_model=GoogleAuthResponse)
+async def demo_sign_in(payload: DemoAuthRequest):
+    """Demo sign-in that issues a real JWT for any email/password combo."""
+    email = payload.email.strip()
+    name = email.split("@")[0] if "@" in email else email
+    demo_sub = f"demo-{email}"
+
+    app_token = create_access_token({
+        "sub": demo_sub,
+        "email": email,
+        "name": name,
+        "picture": None,
+        "provider": "demo",
+    })
+
+    return GoogleAuthResponse(
+        token=app_token,
+        user=AuthUser(
+            id=demo_sub,
+            email=email,
+            name=name,
+            picture=None,
         ),
     )
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CredentialResponse, GoogleLogin, GoogleOAuthProvider } from "@react-oauth/google";
-import { ApiError, authenticateWithGoogle, getGoogleClientConfig } from "@/services/api";
+import { ApiError, authenticateWithDemo, authenticateWithGoogle, getGoogleClientConfig } from "@/services/api";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -43,13 +43,24 @@ const LoginPage = () => {
     loadGoogleConfig();
   }, []);
 
-  const onEmailPasswordSubmit = (e: React.FormEvent) => {
+  const [emailSigningIn, setEmailSigningIn] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  const onEmailPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && password) {
-      localStorage.setItem("auth_token", "demo-token");
-      const displayName = email.split("@")[0] || "User";
-      localStorage.setItem("auth_user", JSON.stringify({ name: displayName, email }));
+    if (!email || !password) return;
+    setEmailSigningIn(true);
+    setEmailError(null);
+    try {
+      const authResponse = await authenticateWithDemo(email, password);
+      localStorage.setItem("auth_token", authResponse.token);
+      localStorage.setItem("auth_user", JSON.stringify(authResponse.user));
       navigate(redirectTo, { replace: true });
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Sign-in failed. Is the backend running?";
+      setEmailError(message);
+    } finally {
+      setEmailSigningIn(false);
     }
   };
 
@@ -217,11 +228,15 @@ const LoginPage = () => {
                   required
                 />
               </div>
+              {emailError && (
+                <p className="text-[11px] text-red-300 text-center">{emailError}</p>
+              )}
               <Button
                 type="submit"
-                className="w-full bg-gradient-action hover:opacity-95 text-white rounded-full py-3 text-[11px] uppercase tracking-widest font-bold shadow-[0_0_20px_rgba(112,0,255,0.35)]"
+                disabled={emailSigningIn}
+                className="w-full bg-gradient-action hover:opacity-95 text-white rounded-full py-3 text-[11px] uppercase tracking-widest font-bold shadow-[0_0_20px_rgba(112,0,255,0.35)] disabled:opacity-50"
               >
-                {isSignUp ? "Sign Up" : "Sign In"}
+                {emailSigningIn ? "Signing in..." : isSignUp ? "Sign Up" : "Sign In"}
               </Button>
             </form>
 

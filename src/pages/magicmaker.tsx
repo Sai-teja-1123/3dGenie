@@ -1,5 +1,5 @@
 import { Upload, ArrowLeft, Twitter, Instagram, Facebook, Trash, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import LogoMark from "@/components/logo-mark";
 // XLSX is dynamically imported when needed to reduce initial bundle size (~500KB saved)
@@ -475,6 +475,44 @@ const MagicMaker = () => {
 
   const MIN_AGE = 1;
   const MAX_AGE = 16;
+  const characterBaseName = useMemo(() => {
+    const trimmed = (model || "character").trim();
+    return trimmed.length > 0 ? trimmed : "character";
+  }, [model]);
+  const toFileSafe = useCallback((value: string) => {
+    return value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "character";
+  }, []);
+  const getOutputFilename = useCallback((sourceFile: string, variant?: string) => {
+    const sourceName = sourceFile.split("/").pop() || sourceFile;
+    const extMatch = sourceName.match(/\.([a-z0-9]+)$/i);
+    const ext = extMatch ? extMatch[1].toLowerCase() : "bin";
+    const base = toFileSafe(characterBaseName);
+    return variant ? `${base}_${variant}.${ext}` : `${base}.${ext}`;
+  }, [characterBaseName, toFileSafe]);
+  const getOutputLabel = useCallback((sourceFile: string, variant?: string) => {
+    const sourceName = sourceFile.split("/").pop() || sourceFile;
+    const extMatch = sourceName.match(/\.([a-z0-9]+)$/i);
+    const ext = extMatch ? extMatch[1].toUpperCase() : "FILE";
+    return variant ? `${characterBaseName} (${variant.toUpperCase()} · ${ext})` : `${characterBaseName} (${ext})`;
+  }, [characterBaseName]);
+  const downloadWithFilename = useCallback(async (url: string, filename: string) => {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Download failed (${response.status})`);
+    }
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+  }, []);
 
   return (
     <div className="relative min-h-screen bg-dark-bg text-white flex flex-col font-sans selection:bg-neon-cyan selection:text-black overflow-hidden">
@@ -689,13 +727,16 @@ const MagicMaker = () => {
               {(previewImageUrl || showPreview) && (
                 <div className="grid grid-cols-2 gap-3">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const imageUrl = previewImageUrl || previewUrl || "";
                       if (imageUrl) {
-                        const link = document.createElement('a');
-                        link.href = imageUrl;
-                        link.download = `preview-${model || 'character'}.jpg`;
-                        link.click();
+                        const downloadName = getOutputFilename(imageUrl);
+                        try {
+                          await downloadWithFilename(imageUrl, downloadName);
+                        } catch (error) {
+                          console.error("Preview download failed:", error);
+                          setGenerationMessage("Preview download failed. Please try again.");
+                        }
                       }
                     }}
                     disabled={!previewImageUrl && !previewUrl}
@@ -807,16 +848,22 @@ const MagicMaker = () => {
                     </button>
                     {resultFiles.length > 0 && (
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           // Download all files
-                          resultFiles.forEach((file) => {
+                          for (const file of resultFiles) {
                             if (currentJobId) {
-                              const link = document.createElement('a');
-                              link.href = getResultFileUrl(currentJobId, file);
-                              link.download = file.split('/').pop() || 'model';
-                              link.click();
+                              const variant = /\.(glb|obj)$/i.test(file) ? "3d" : undefined;
+                              const url = getResultFileUrl(currentJobId, file);
+                              const filename = getOutputFilename(file, variant);
+                              try {
+                                await downloadWithFilename(url, filename);
+                              } catch (error) {
+                                console.error("File download failed:", error);
+                                setGenerationMessage(`Download failed for ${filename}`);
+                                break;
+                              }
                             }
-                          });
+                          }
                         }}
                         className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-action text-white font-bold py-2.5 px-5 text-sm transition-all shadow-[0_0_20px_rgba(112,0,255,0.3)] hover:opacity-95 hover:scale-105"
                       >
@@ -847,15 +894,26 @@ const MagicMaker = () => {
                       <div className="text-sm font-semibold text-white text-center">Download Files:</div>
                       <div className="flex flex-col gap-2">
                         {resultFiles.map((file, idx) => (
-                          <a
+                          <button
                             key={idx}
-                            href={currentJobId ? getResultFileUrl(currentJobId, file) : '#'}
-                            download
+                            type="button"
+                            onClick={async () => {
+                              if (!currentJobId) return;
+                              const variant = /\.(glb|obj)$/i.test(file) ? "3d" : undefined;
+                              const url = getResultFileUrl(currentJobId, file);
+                              const filename = getOutputFilename(file, variant);
+                              try {
+                                await downloadWithFilename(url, filename);
+                              } catch (error) {
+                                console.error("File download failed:", error);
+                                setGenerationMessage(`Download failed for ${filename}`);
+                              }
+                            }}
                             className="inline-flex items-center justify-center gap-2 text-sm glass hover:bg-white/10 border border-white/15 rounded-xl px-4 py-3 text-white/80 hover:text-white transition-all backdrop-blur-sm hover:scale-105"
                           >
                             <Download className="h-4 w-4" />
-                            {file.split('/').pop()}
-                          </a>
+                            {getOutputLabel(file, /\.(glb|obj)$/i.test(file) ? "3d" : undefined)}
+                          </button>
                         ))}
                       </div>
                     </div>
