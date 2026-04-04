@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Maximize2, Minimize2 } from "lucide-react";
+import { ArrowRight, Box, Maximize2, Minimize2 } from "lucide-react";
 import { memo, useState, useEffect, useRef } from "react";
 import ModelViewer3D from "./ModelViewer3D";
 
@@ -85,7 +85,15 @@ const Hero = memo(() => {
               Create Your Hero - Get STL File
               <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform motion-reduce:transition-none" />
             </Button>
-            <button className="flex items-center gap-3 px-8 py-4 rounded-full glass text-sm font-medium text-white/80 hover:bg-white/10 transition-all duration-300">
+            <button
+              className="flex items-center gap-3 px-8 py-4 rounded-full glass text-sm font-medium text-white/80 hover:bg-white/10 transition-all duration-300"
+              onClick={() => {
+                const showcaseSection = document.getElementById("showcase");
+                if (showcaseSection) {
+                  showcaseSection.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+              }}
+            >
               View Showcase
             </button>
           </div>
@@ -96,8 +104,8 @@ const Hero = memo(() => {
               <span>Secure photo handling</span>
             </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-white/75">
-              <span>🖨️</span>
-              <span>Print anywhere</span>
+              <Box className="h-4 w-4 text-white/85" />
+              <span>3D print anywhere</span>
             </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-white/75">
               <span>⭐</span>
