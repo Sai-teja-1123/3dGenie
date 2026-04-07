@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import logging
 import os
 import time
 from pathlib import Path
@@ -10,6 +11,8 @@ from urllib.parse import urlparse
 
 import requests
 from PIL import Image, ImageOps
+
+logger = logging.getLogger(__name__)
 
 
 class Tripo3DError(Exception):
@@ -37,6 +40,10 @@ class Tripo3DService:
         self.max_retries = int(os.getenv("TRIPO_MAX_RETRIES", "3"))
         self.retry_backoff_sec = float(os.getenv("TRIPO_RETRY_BACKOFF_SEC", "1.0"))
         self.task_version = os.getenv("TRIPO_TASK_VERSION", "").strip()
+        self.texture_quality = os.getenv("TRIPO_TEXTURE_QUALITY", "standard").strip()
+        self.geometry_quality = os.getenv("TRIPO_GEOMETRY_QUALITY", "standard").strip()
+        self.enable_image_autofix = os.getenv("TRIPO_IMAGE_AUTOFIX", "true").lower() == "true"
+        self.texture_alignment = os.getenv("TRIPO_TEXTURE_ALIGNMENT", "original_image").strip()
         self._base_urls = self._build_base_urls()
 
     @property
@@ -219,7 +226,7 @@ class Tripo3DService:
 
     def create_image_to_model_task(self, file_token: str, file_type: str = "jpg") -> str:
         """Create Tripo image-to-model task and return task id."""
-        payload = {
+        payload: dict = {
             "type": "image_to_model",
             "file": {
                 "type": file_type,
@@ -227,7 +234,20 @@ class Tripo3DService:
             },
         }
         if self.task_version:
-            payload["version"] = self.task_version
+            payload["model_version"] = self.task_version
+        if self.enable_image_autofix:
+            payload["enable_image_autofix"] = True
+        payload["texture"] = True
+        payload["pbr"] = True
+        if self.texture_quality and self.texture_quality != "standard":
+            payload["texture_quality"] = self.texture_quality
+        if self.texture_alignment:
+            payload["texture_alignment"] = self.texture_alignment
+        if self.geometry_quality and self.geometry_quality != "standard":
+            payload["geometry_quality"] = self.geometry_quality
+        payload_summary = {k: v for k, v in payload.items() if k != "file"}
+        print(f"[TRIPO] Task payload: {payload_summary}")
+        logger.info("Tripo task payload: %s", payload_summary)
         headers = {**self._headers, "Content-Type": "application/json"}
         try:
             response = self._request_with_fallback("POST", "/task", headers=headers, json=payload)
@@ -244,6 +264,8 @@ class Tripo3DService:
         task_id = (data.get("data") or {}).get("task_id")
         if not task_id:
             raise Tripo3DError("Tripo task created but task_id missing")
+        print(f"[TRIPO] Task created: {task_id}")
+        logger.info("Tripo task created: %s", task_id)
         return task_id
 
     def create_task_from_image(self, image_bytes: bytes, mime_type: Optional[str] = None) -> str:
@@ -266,7 +288,13 @@ class Tripo3DService:
         if data.get("code") != 0:
             raise Tripo3DError(f"Tripo task status error: {data.get('message', 'unknown error')}")
 
-        return data.get("data") or {}
+        task_data = data.get("data") or {}
+        status = task_data.get("status")
+        if status in ("success", "failed"):
+            version_used = task_data.get("model_version") or task_data.get("version") or "unknown"
+            print(f"[TRIPO] Task {task_id} finished: status={status}, model_version={version_used}")
+            logger.info("Tripo task %s finished: status=%s, model_version=%s", task_id, status, version_used)
+        return task_data
 
     def extract_model_url(self, task_data: dict) -> Optional[str]:
         """Extract GLB model URL from task result payload."""

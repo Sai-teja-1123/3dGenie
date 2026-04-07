@@ -90,10 +90,15 @@ if upload_result.get("code") == 0:
 
     data = {
         "type": "image_to_model",
+        "model_version": "v3.0-20250812",
         "file": {
             "type": "jpg",
             "file_token": image_token
-        }
+        },
+        "enable_image_autofix": True,
+        "texture": True,
+        "pbr": True,
+        "texture_alignment": "original_image",
     }
 
     task_response = requests.post(task_url, headers=task_headers, json=data)
